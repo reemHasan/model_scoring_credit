@@ -1,5 +1,6 @@
+from time import perf_counter
+import uuid
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
 # from typing import Dict, Any, List
 import pandas as pd
 import joblib
@@ -37,9 +38,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class LoanID(BaseModel):
-    id: int
-
+# Routes
 @app.get("/")
 def root():
     """Informations about the API and how to use it."""
@@ -51,41 +50,47 @@ def root():
 @app.get("/health")
 def health():
     try:
-        if app.state.model is not None:
-            return {"status": "ok", "model_loaded": True}
-        else:
-            return {"status": "error", "model_loaded": False}
+        return {"status": "ok", "model_loaded": app.state.model is not None}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-        # return {"status": "error", "details": str(e)}
 
 @app.post("/predict/{loan_id}")
 async def predict(loan_id: int):
+    request_id  = str(uuid.uuid4())
+    t_start     = perf_counter()
     try:
         # Ensure client id exists in test data
-        if (loan_id-1) >= app.state.client_data.shape[0]:            
-            raise HTTPException(status_code=404, detail="Client id not in application database. Enter a whole number between 1 and 48745.")
-        if ((loan_id-1) < 0):
-            raise HTTPException(status_code=404, detail="Client id not in application database. Enter a whole number between 1 and 48745.")
+        if not (1 <= loan_id <= app.state.client_data.shape[0]):
+            msg = f"Client id {loan_id} not in database. Enter 1–{app.state.client_data.shape[0]}."
+            raise HTTPException(status_code=404, detail=msg)
         # Load current client data
         client_particulars = app.state.client_data.iloc[[loan_id-1]]
-        # Predict decision of client credit application
-        prediction = app.state.model.predict_proba(client_particulars)
+
+        # Predict decision of client credit application +++++++++++++++++++++++++
+        
         # prediction[0][0] is proba of class 0 (no default) and prediction[0][1] is proba of class 1 (default)
-        proba = prediction[0][1] 
-        if proba > app.state.best_threshold:
-            proba_class = 'default'
-            decision = "Reject loan application"
-        else:
-            proba_class = 'no default'
-            decision = "Accept loan application"
+        # Inference (timed separately)
+        t_infer   = perf_counter() #The time.perf_counter() function returns a high-resolution timer value used to measure how long a piece of code takes to run. It is designed for performance measurement, includes time spent during sleep
+        prediction = app.state.model.predict_proba(client_particulars)
+        inference_ms = round((perf_counter() - t_infer) * 1000, 2)
+        proba      = float(prediction[0][1])
+        proba_class = "default"    if proba > app.state.best_threshold else "no default"
+        decision    = "Reject loan application" if proba > app.state.best_threshold else "Accept loan application"
+        
+        # Get shap values for current client +++++++++++++++++++++++++++++++++++++++++++++
         try:
+            
             shap_values_client = app.state.shap_values_all.iloc[[loan_id-1]]
+            
+            total_ms = round((perf_counter() - t_start) * 1000, 2)
             return {
+                'request_id': request_id,
                 'Client_id': loan_id,
                 'Client default probability': proba, 
                 'Class': proba_class,
                 'Decision': decision,
+                'inference_ms': inference_ms,
+                'total_ms': total_ms,
                 'Client_info': client_particulars.to_json(orient='records'),
                 'Expected_Shap_Value' : float(app.state.expected_value),
                 'Shap_values_client' : shap_values_client.to_json(orient='records')
