@@ -8,6 +8,7 @@ dependencies = [
     "alembic>=1.18.4",
     "cufflinks>=0.17.3",
     "evidently>=0.7.21",
+    "gradio>=6.14.0",
     "huggingface-hub>=1.12.0",
     "ipykernel>=7.2.0",
     "ipywidgets>=8.1.8",

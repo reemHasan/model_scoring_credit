@@ -87,6 +87,16 @@ def plot_shap_waterfall(shap_values_dict: dict, client_data: dict, expected_valu
     plt.tight_layout()
     return fig
 
+# Create empty plot 
+def empty_plot():
+    fig, ax = plt.subplots()
+    fig.patch.set_facecolor("black")
+    ax.set_facecolor("black")
+    ax.text(0.5, 0.5, "Waiting for SHAP output...",
+            ha="center", va="center", fontsize=14, color="white", fontstyle="italic")
+    ax.axis("off")
+    return fig
+
 # MAIN PREDICT FUNCTION
 def predict_client(loan_id: int):
     try:
@@ -114,16 +124,16 @@ def predict_client(loan_id: int):
     decision = data["Decision"]
     cls      = data["Class"]
 
-    # ── Decision badge ─────────────────────────────────────────────────────────
+    # ── Decision badge
     if cls == "default":
-        badge_color = "#FC8181"   # red
+        badge_color = "#2D1515"   # red
         icon        = "🚫"
-        bg          = "#2D1515"
+        bg          = "#F1CDCD"
         border      = "#E53E3E"
     else:
-        badge_color = "#68D391"   # green
+        badge_color = "#152D1E"   # green
         icon        = "✅"
-        bg          = "#152D1E"
+        bg          = "#A0DDB7"
         border      = "#38A169"
 
     decision_html = f"""
@@ -134,12 +144,13 @@ def predict_client(loan_id: int):
         padding:20px 28px;
         font-family:'Courier New',monospace;
         margin-bottom:8px;
+        text-align: center
     ">
         <div style="font-size:25px;font-weight:900;color:{badge_color};letter-spacing:1px">
             {icon} {decision}
         </div>
-        <div style="margin-top:10px;font-size:17px;color:#A0AEC0">
-            Client ID &nbsp;<span style="color:white;font-weight:700">{loan_id}</span>
+        <div style="margin-top:10px;font-size:17px;color:#29333f;font-weight:500">
+            Client ID &nbsp;<span style="color:#29333f;font-weight:700">{loan_id}</span>
             &nbsp;·&nbsp;
             Default probability &nbsp;<span style="color:{badge_color};font-weight:700">{proba:.1%}</span>
             &nbsp;·&nbsp;
@@ -148,7 +159,7 @@ def predict_client(loan_id: int):
     </div>
     """
 
-    # ── Client info table ──────────────────────────────────────────────────────
+    # ── Client info table 
     client_info = json.loads(data["Client_info"])[0]
     rows = "".join(
         f"<tr><td style='color:white;padding:4px 12px 4px 0'>{k}</td>"
@@ -156,17 +167,19 @@ def predict_client(loan_id: int):
         for k, v in client_info.items()
     )
     info_html = f"""
+    <div style='text-align:center;color:#ffffff;font-size:20px;margin-bottom:3px'>CLIENT INFORMATION </div>
+            <div style="text-align:center;width:300px;height:1px;background:#3182CE;margin:3px auto 0"></div>
     <table style="font-family:'Courier New',monospace;font-size:15px;border-collapse:collapse">
         {rows}
     </table>
     """
 
-    # ── SHAP waterfall ─────────────────────────────────────────────────────────
+    # ── SHAP waterfall
     shap_dict     = json.loads(data["Shap_values_client"])[0]
     # expected_value is returned by API — if not, default to 0.5
-    expected_val  = data.get("Expected_shap_value", 0.5)
-    #fig           = plot_waterfall(shap_dict, expected_val, proba)
-    fig = plot_shap_waterfall(shap_dict, client_info, expected_val)    
+    expected_val  = data.get("Expected_Shap_Value")
+    fig = plot_waterfall(shap_dict, expected_val, proba)
+    #fig = plot_shap_waterfall(shap_dict, client_info, expected_val)    
 
     return decision_html,fig, info_html
 
@@ -206,14 +219,14 @@ with gr.Blocks(css=load_css(), title="Home Credit Scoring") as demo:
             predict_btn = gr.Button("▶  RUN PREDICTION", variant="primary", size="lg")
 
     # ── Outputs ────────────────────────────────────────────────────────────────
-    decision_out = gr.HTML(label="Decision")
+    with gr.Row():
+        with gr.Column(scale=0, min_width=800):
+            decision_out = gr.HTML(label="Decision")
     with gr.Row():
         with gr.Column(scale=2):
-            shap_plot = gr.Plot(label="SHAP Waterfall — Feature Contributions")
+            shap_plot = gr.Plot(value=empty_plot, label="SHAP Waterfall — Feature Contributions")
         with gr.Column(scale=1):
-            gr.HTML("""<div style='text-align:center;color:#ffffff;font-size:20px;margin-bottom:3px'>CLIENT INFORMATION </div>
-            <div style="text-align:center;width:300px;height:1px;background:#3182CE;margin:3px auto 0"></div>""")
-            client_info_out = gr.HTML()
+            client_info_out = gr.HTML(label="Information about the current client application")
 
     # ── Footer ─────────────────────────────────────────────────────────────────
     gr.HTML("""
