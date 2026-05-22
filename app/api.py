@@ -62,10 +62,9 @@ async def predict(loan_id: int):
     t_start     = perf_counter()
     try:
         # Ensure client id exists in test data
-        if (loan_id-1) >= app.state.client_data.shape[0]:            
-            raise HTTPException(status_code=404, detail="Client id not in application database. Enter a whole number between 1 and 48745.")
-        if ((loan_id-1) < 0):
-            raise HTTPException(status_code=404, detail="Client id not in application database. Enter a whole number between 1 and 48745.")
+        if not (1 <= loan_id <= app.state.client_data.shape[0]):
+            msg = f"Client id {loan_id} not in database. Enter 1–{app.state.client_data.shape[0]}."
+            raise HTTPException(status_code=404, detail=msg)
         # Load current client data
         client_particulars = app.state.client_data.iloc[[loan_id-1]]
 
@@ -82,9 +81,7 @@ async def predict(loan_id: int):
         
         # Get shap values for current client +++++++++++++++++++++++++++++++++++++++++++++
         try:
-            
             shap_values_client = app.state.shap_values_all.iloc[[loan_id-1]]
-            
             total_ms = round((perf_counter() - t_start) * 1000, 2)
             return {
                 'request_id': request_id,
