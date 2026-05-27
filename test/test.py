@@ -10,7 +10,7 @@ import json
 import numpy as np
 import pandas as pd
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from pathlib import Path
 import sys
@@ -42,6 +42,7 @@ def make_fake_model(proba: float = 0.3) -> MagicMock:
     return model
 
 # Core fixture — injects state directly, bypasses lifespan 
+# Also patches mount_gradio_app so Gradio never initialises during tests.
 @pytest.fixture()
 def client(request):
     
@@ -53,24 +54,23 @@ def client(request):
     app.state.shap_values_all = make_fake_shap_values()
     app.state.expected_value  = 0.12
 
-    # TestClient context manager handles startup/shutdown
-    with TestClient(app, raise_server_exceptions=True) as c:
-        yield c
+    # Patch mount_gradio_app so Gradio never starts during tests
+    # (api.py calls mount_gradio_app at import time — we neutralise it)
+    """Since api.py now calls mount_gradio_app(app, demo, path="/") at the bottom,
+      TestClient would trigger Gradio's full startup (loading UI, checking dependencies). 
+      This patch makes mount_gradio_app a no-op — it just returns the app unchanged.
+    """
+    with patch("gradio.routes.mount_gradio_app", side_effect=lambda a, d, **kw: a):
+        with TestClient(app, raise_server_exceptions=True) as c:
+            yield c
     # Teardown — reset state after each test
     for attr in ("model", "features", "best_threshold",
                  "client_data", "shap_values_all", "expected_value"):
         if hasattr(app.state, attr):
             delattr(app.state, attr)
 
-# 1. Test root endpoint
-class TestRootEndpoint:
-    def test_status_code_200(self, client):
-        assert client.get("/").status_code == 200
 
-    def test_status_is_running(self, client):
-        assert client.get("/").json()["status"] == "running"
-
-# 2. Test health endpoint
+# 1. Test health endpoint
 class TestHealthEndpoint:
     def test_status_code_200(self, client):
         assert client.get("/health").status_code == 200
@@ -82,8 +82,22 @@ class TestHealthEndpoint:
     def test_status_ok(self, client):
         data = client.get("/health").json()
         assert data["status"] == "ok"
+    
+    def test_model_loaded_false_when_none(self):
+        """When model is None, health must return model_loaded=False."""
+        """We patch mount_gradio_app to prevent Gradio from starting during this test."""
+        app.state.model           = None
+        app.state.features        = FEATURE_NAMES
+        app.state.best_threshold  = THRESHOLD
+        app.state.client_data     = make_fake_client_data()
+        app.state.shap_values_all = make_fake_shap_values()
+        app.state.expected_value  = 0.12
+        with patch("gradio.routes.mount_gradio_app", side_effect=lambda a, d, **kw: a):
+            with TestClient(app) as c:
+                data = c.get("/health").json()
+        assert data["model_loaded"] is False
 
-# 3. Test Predict endpoint
+# 2. Test Predict endpoint
 class TestPredictEndpoint:
 
     required_keys = {
@@ -109,13 +123,13 @@ class TestPredictEndpoint:
         assert client.post("/predict/1").json()["Client_id"] == 1
     
     def test_id_zero_returns_404(self, client):
-        assert client.post("/predict/0").status_code == 400 # The 404 errors represent resources not existing, and in error 400, the resource exists, but the input is wrong
+        assert client.post("/predict/0").status_code == 404 # The 404 errors represent resources not existing, and in error 400, the resource exists, but the input is wrong
   
     def test_id_negative_returns_404(self, client):
-        assert client.post("/predict/-5").status_code == 400
+        assert client.post("/predict/-5").status_code == 404
 
     def test_id_above_max_returns_404(self, client):
-        assert client.post(f"/predict/{N_CLIENTS + 1}").status_code == 400
+        assert client.post(f"/predict/{N_CLIENTS + 1}").status_code == 404
 
     def test_string_id_returns_422(self, client):
         assert client.post("/predict/abc").status_code == 422
@@ -191,6 +205,58 @@ class TestPredictEndpoint:
             assert data["Decision"] == "Reject loan application"
         else:
             assert data["Decision"] == "Accept loan application"
+# 3. Test the function run_prediction() directly
+class TestPredictor:
+    """
+    Tests predict_service.run_prediction() directly — no HTTP, no FastAPI.
+    Faster and more targeted than going through the full HTTP stack.
+    """
 
+    @pytest.fixture()
+    def fake_state(self):
+        """A plain object that mimics app.state."""
+        class FakeState:
+            pass
+        state = FakeState()
+        state.model           = make_fake_model(proba=0.4)
+        state.features        = FEATURE_NAMES
+        state.best_threshold  = THRESHOLD
+        state.client_data     = make_fake_client_data()
+        state.shap_values_all = make_fake_shap_values()
+        state.expected_value  = 0.12
+        return state
+
+    def test_valid_id_returns_dict(self, fake_state):
+        from app.predict_service import run_prediction
+        result = run_prediction(1, fake_state)
+        assert isinstance(result, dict)
+
+    def test_result_has_required_keys(self, fake_state):
+        from app.predict_service import run_prediction
+        result = run_prediction(1, fake_state)
+        for key in ("request_id", "inference_ms", "total_ms", "Client_id", "Client default probability",
+                    "Class", "Decision", "Shap_values_client", "Expected_Shap_Value", "Client_info"):
+            assert key in result
+
+    def test_invalid_id_raises_value_error(self, fake_state):
+        from app.predict_service import run_prediction
+        with pytest.raises(ValueError):
+            run_prediction(0, fake_state)
+
+    def test_id_above_max_raises_value_error(self, fake_state):
+        from app.predict_service import run_prediction
+        with pytest.raises(ValueError):
+            run_prediction(N_CLIENTS + 1, fake_state)
+
+    def test_client_id_in_result_matches_input(self, fake_state):
+        from app.predict_service import run_prediction
+        result = run_prediction(3, fake_state)
+        assert result["Client_id"] == 3
+
+    def test_shap_dict_has_all_features(self, fake_state):
+        from app.predict_service import run_prediction
+        result = run_prediction(1, fake_state)
+        for feat in FEATURE_NAMES:
+            assert feat in result["Shap_values_client"]
 
     
