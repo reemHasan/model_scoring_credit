@@ -1,12 +1,11 @@
 ---
-title: Loan Scoring App
-emoji: 🐢
-colorFrom: green
-colorTo: indigo
-sdk: docker
-pinned: false
 license: mit
-------------
+title: Loan Scoring App
+sdk: docker
+emoji: 📊
+colorFrom: purple
+colorTo: pink
+---
 
 # Model Scoring Credit
 
