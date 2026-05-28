@@ -20,8 +20,8 @@ services:
       target: runtime           # use the lean runtime stage
     container_name: scoring_api
     ports:
-     # - "7860:7860"             # Gradio UI  → http://localhost:7860
-      - "8000:8000"             # FastAPI docs → http://localhost:8000/docs
+     - "7860:7860"             # Gradio UI  → http://localhost:7860
+     # - "8000:8000"             # FastAPI docs → http://localhost:8000/docs
                                 # (only if you run uvicorn on 8000 locally)
       # HuggingFace token for pushing logs to HF Dataset
       # HF_TOKEN: ${HF_TOKEN}

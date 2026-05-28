@@ -49,10 +49,10 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONPATH="/app/app"
     
 # HuggingFace Spaces exposes port 7860
-#EXPOSE 7860
-EXPOSE 8000
+EXPOSE 7860
+#EXPOSE 8000
 # Start FastAPI + Gradio on port 7860
 # api.py mounts Gradio via mount_gradio_app — one process, one port
-# CMD ["uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "7860"]
 # test docker in local with uvicorn on 8000
-CMD ["uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "8000"]
+#CMD ["uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "8000"]
