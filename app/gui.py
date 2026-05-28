@@ -8,19 +8,14 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import shap
 from predict_service import run_prediction
+from state_store import get_state 
+
 # CONFIG
 # Deploy in local
 #API_BASE = "http://127.0.0.1:8000"
 # change if deployed on HF Spaces   
 # API_BASE = "https://home-credit-scoring.hf.space"
 
-# Load custom CSS for styling
-"""
-def load_css():
-    with open('./css/style.css', 'r') as file:
-        css_content = file.read()
-    return css_content
-"""
 # SHAP WATERFALL PLOT
 def plot_waterfall(shap_values_dict: dict, expected_value: float, proba: float) -> plt.Figure:
     """Build a clean SHAP waterfall chart from the API response."""
@@ -101,10 +96,10 @@ def empty_plot():
 # MAIN PREDICT FUNCTION
 def predict_client(loan_id: int):
     """Called by Gradio — gets app.state from the FastAPI app object."""
-    from api import app  
 
     try:
-        data = run_prediction(int(loan_id), app.state)
+        state = get_state()
+        data = run_prediction(int(loan_id), state)
     except ValueError as e:
         return f"<div style='color:red'>{e}</div>", None, ""
 
@@ -150,13 +145,12 @@ def predict_client(loan_id: int):
     # ── Client info table 
     client_info = json.loads(data["Client_info"])[0]
     rows = "".join(
-        f"<tr><td style='color:white;padding:4px 12px 4px 0'>{k}</td>"
-        f"<td style='color:white;font-weight:600'>{round(v,4) if isinstance(v,float) else v}</td></tr>"
+        f"<tr><td style='color:white;padding:4px 0px 4px 0'>{k}</td>"
+        f"<td style='color:white;font-weight:400'>{round(v,4) if isinstance(v,float) else v}</td></tr>"
         for k, v in client_info.items()
     )
     info_html = f"""
     <div style='text-align:center;color:#ffffff;font-size:20px;margin-bottom:3px'>CLIENT INFORMATION </div>
-            <div style="text-align:center;width:300px;height:1px;background:#3182CE;margin:3px auto 0"></div>
     <table style="font-family:'Courier New',monospace;font-size:15px;border-collapse:collapse">
         {rows}
     </table>

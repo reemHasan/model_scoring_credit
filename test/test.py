@@ -17,6 +17,7 @@ import sys
 # import app ONCE here — lifespan is bypassed by the fixture
 sys.path.append(str(Path("..").resolve()))
 from app.api import app
+from app.state_store import set_state
 
 #Fake data config
 N_CLIENTS     = 10
@@ -53,7 +54,8 @@ def client(request):
     app.state.client_data     = make_fake_client_data()
     app.state.shap_values_all = make_fake_shap_values()
     app.state.expected_value  = 0.12
-
+    set_state(app.state)       # keep state_store in sync with injected state
+    
     # Patch mount_gradio_app so Gradio never starts during tests
     # (api.py calls mount_gradio_app at import time — we neutralise it)
     """Since api.py now calls mount_gradio_app(app, demo, path="/") at the bottom,
