@@ -1,5 +1,4 @@
 ---
-
 title: Loan Scoring App
 emoji: 🐢
 colorFrom: green
