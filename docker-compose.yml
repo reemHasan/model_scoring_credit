@@ -1,0 +1,37 @@
+# docker-compose.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# Local development stack:
+#   api       — FastAPI + Gradio (mirrors the HF Spaces container)
+#   postgres  — local PostgreSQL for log storage
+#
+# Usage:
+#   docker compose up --build          # start everything
+#   docker compose up --build api      # rebuild api only
+#   docker compose down -v             # stop + delete volumes
+#   docker compose logs -f api         # follow api logs
+# The builder stage is a disposable workshop — you use it to assemble everything, then you move only the finished product into the runtime stage and throw the workshop away.
+services:
+
+  # ── FastAPI + Gradio ────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime           # use the lean runtime stage
+    container_name: scoring_api
+    ports:
+     # - "7860:7860"             # Gradio UI  → http://localhost:7860
+      - "8000:8000"             # FastAPI docs → http://localhost:8000/docs
+                                # (only if you run uvicorn on 8000 locally)
+      # HuggingFace token for pushing logs to HF Dataset
+      # HF_TOKEN: ${HF_TOKEN}
+    environment:
+      PYTHONPATH: "/app/app"
+    volumes:
+      # Mount source code for live reload during development
+      - ./app/:/app/app/
+      # Persist logs on host so we can read them without entering the container
+      - ./logs:/app/logs
+
+    restart: unless-stopped
+

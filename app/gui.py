@@ -7,18 +7,15 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import shap
+from predict_service import run_prediction
+from state_store import get_state 
 
 # CONFIG
 # Deploy in local
-API_BASE = "http://127.0.0.1:8000"
+#API_BASE = "http://127.0.0.1:8000"
 # change if deployed on HF Spaces   
 # API_BASE = "https://home-credit-scoring.hf.space"
 
-# Load custom CSS for styling
-def load_css():
-    with open('./css/style.css', 'r') as file:
-        css_content = file.read()
-    return css_content
 # SHAP WATERFALL PLOT
 def plot_waterfall(shap_values_dict: dict, expected_value: float, proba: float) -> plt.Figure:
     """Build a clean SHAP waterfall chart from the API response."""
@@ -63,8 +60,7 @@ def plot_waterfall(shap_values_dict: dict, expected_value: float, proba: float) 
                         mpatches.Patch(color="#F6E05E", label=f"Prediction f(x)={proba:.3f}")],
               loc="lower right", fontsize=7.5,
               facecolor="#1A202C", edgecolor="#2D3748", labelcolor="white")
-    ax.set_title("SHAP Waterfall — Feature Contributions", color="white",
-                 fontsize=11, fontweight="bold", pad=12)
+    # ax.set_title("SHAP Waterfall — Feature Contributions", color="white", fontsize=11, fontweight="bold", pad=12)
     fig.tight_layout()
     return fig
 
@@ -99,27 +95,14 @@ def empty_plot():
 
 # MAIN PREDICT FUNCTION
 def predict_client(loan_id: int):
-    try:
-        resp = requests.post(f"{API_BASE}/predict/{loan_id}", timeout=15)
-    except requests.exceptions.ConnectionError:
-        return (
-            "<div style='color:#FC8181;font-size:25px'>❌ Cannot reach the API. "
-            "Make sure it is running at <code>" + API_BASE + "</code></div>",
-            None, ""
-        )
-    if resp.status_code == 404:
-        return (
-            "<div style='color:#FC8181;font-size:30px'>❌ "
-            + resp.json().get("detail", "Client not found") + "</div>",
-            None, ""
-        )
-    if resp.status_code != 200:
-        return (
-            f"<div style='color:#FC8181;font-size:30px'>❌ API error {resp.status_code}</div>",
-            None, ""
-        )
+    """Called by Gradio — gets app.state from the FastAPI app object."""
 
-    data     = resp.json()
+    try:
+        state = get_state()
+        data = run_prediction(int(loan_id), state)
+    except ValueError as e:
+        return f"<div style='color:red'>{e}</div>", None, ""
+
     proba    = data["Client default probability"]
     decision = data["Decision"]
     cls      = data["Class"]
@@ -162,13 +145,12 @@ def predict_client(loan_id: int):
     # ── Client info table 
     client_info = json.loads(data["Client_info"])[0]
     rows = "".join(
-        f"<tr><td style='color:white;padding:4px 12px 4px 0'>{k}</td>"
-        f"<td style='color:white;font-weight:600'>{round(v,4) if isinstance(v,float) else v}</td></tr>"
+        f"<tr><td style='color:white;padding:4px 0px 4px 0'>{k}</td>"
+        f"<td style='color:white;font-weight:400'>{round(v,4) if isinstance(v,float) else v}</td></tr>"
         for k, v in client_info.items()
     )
     info_html = f"""
     <div style='text-align:center;color:#ffffff;font-size:20px;margin-bottom:3px'>CLIENT INFORMATION </div>
-            <div style="text-align:center;width:300px;height:1px;background:#3182CE;margin:3px auto 0"></div>
     <table style="font-family:'Courier New',monospace;font-size:15px;border-collapse:collapse">
         {rows}
     </table>
@@ -184,8 +166,43 @@ def predict_client(loan_id: int):
     return decision_html,fig, info_html
 
 # ── GRADIO UI ─────────────────────────────────────────────────────────────────
-
-with gr.Blocks(css=load_css(), title="Home Credit Scoring") as demo:
+css_ui = """ 
+body, .gradio-container {
+    background: #0F1117 !important;
+    font-family: 'Courier New', monospace !important;
+}
+.gr-panel, .gr-box {
+    background: #1A202C !important;
+    border: 1px solid #2D3748 !important;
+    border-radius: 12px !important;
+}
+h1, h2, h3, label, .label-wrap {
+    color: #ffffff !important;
+}
+.gr-button-primary {
+    background: #3182CE !important;
+    border: none !important;
+    font-family: 'Courier New', monospace !important;
+    font-weight: 700 !important;
+    letter-spacing: 1px !important;
+}
+.gr-button-primary:hover { background: #2B6CB0 !important; }
+input[type=number], .gr-number input {
+    background: #2D3748 !important;
+    color: white !important;
+    border: 1px solid #4A5568 !important;
+}
+.gr-row .gr-column .gr-slider input {
+    font-size: 22px !important;
+}
+.gr-row .gr-column .gr-slider label {
+    font-size: 24px !important;
+}
+.gr-row .gr-column .gr-slider .gr-form-text {
+    font-size: 18px !important;
+}
+"""
+with gr.Blocks(css=css_ui, title="Home Credit Scoring") as demo:
 
     # ── Header ─────────────────────────────────────────────────────────────────
     gr.HTML("""
@@ -252,5 +269,5 @@ with gr.Blocks(css=load_css(), title="Home Credit Scoring") as demo:
     )
 """
 
-if __name__ == "__main__":
-    demo.launch(server_port=7860)
+#if __name__ == "__main__":
+#    demo.launch(server_port=7860)
