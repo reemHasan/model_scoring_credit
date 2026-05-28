@@ -38,7 +38,7 @@ jobs:
           python-version: "3.12"
  
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync
  
       - name: Run tests with coverage
         run: uv run pytest test/test.py -v --tb=short --cov=app --cov-report=term-missing --cov-report=html
