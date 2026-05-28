@@ -145,7 +145,7 @@ def predict_client(loan_id: int):
     # ── Client info table 
     client_info = json.loads(data["Client_info"])[0]
     rows = "".join(
-        f"<tr><td style='color:white;padding:4px 0px 4px 0'>{k}</td>"
+        f"<tr><td style='color:white'>{k}</td>"
         f"<td style='color:white;font-weight:400'>{round(v,4) if isinstance(v,float) else v}</td></tr>"
         for k, v in client_info.items()
     )
