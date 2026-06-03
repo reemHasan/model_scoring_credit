@@ -22,7 +22,8 @@ import os
 import json
 import pathlib
 from dotenv import load_dotenv
-load_dotenv() 
+# Load .env from project root
+load_dotenv(pathlib.Path(__file__).resolve().parents[1] / ".env")
 
 # ── Connection URLs ───────────────────────────────────────────────────────────
 def _build_url(async_: bool = False) -> str:

@@ -18,7 +18,7 @@ class LoanApiLog(Base):
     One row per API prediction call.
     features and shap_values stored as JSON — schema-flexible,
     """
-    __tablename__ = "Loan_api_logs"
+    __tablename__ = "loan_api_logs"
 
     id:            Mapped[int]            = mapped_column(Integer,  primary_key=True, autoincrement=True)
     request_id:    Mapped[str]            = mapped_column(Text,     nullable=False)

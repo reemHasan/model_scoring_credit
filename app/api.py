@@ -11,7 +11,7 @@ from app.state_store import set_state
 from app.database import init_db
 from app.gui import demo
 from gradio.routes import mount_gradio_app
-from fastapi.responses import RedirectResponse
+# from fastapi.responses import RedirectResponse
 
 
 BASE_DIR = Path(__file__).parent.parent
