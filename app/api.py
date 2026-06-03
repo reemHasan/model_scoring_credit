@@ -57,9 +57,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-@app.get("/")
-async def root_redirect():
-    return RedirectResponse(url="/gui")
+#@app.get("/")
+#async def root_redirect():
+#    return RedirectResponse(url="/gui")
 
 @app.get("/health")
 def health(request: Request):
@@ -68,7 +68,7 @@ def health(request: Request):
         model = request.app.state.model if hasattr(request.app.state, "model") else None
         return {"status": "ok", "model_loaded": model is not None, "version": "1.0.0",
         "available_endpoints": {
-            "gui": "/gui",
+        #    "gui": "/gui",
             "predict": "/predict/{loan_id}",
             "docs": "/docs",},
         }
@@ -83,5 +83,5 @@ async def predict(loan_id: int, request: Request): # background tasks to be run 
 
 
 # Mount Gradio at "/" 
-app = mount_gradio_app(app, demo, path="/gui")
+app = mount_gradio_app(app, demo, path="/")
 # print(app.state)
