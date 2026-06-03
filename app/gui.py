@@ -113,7 +113,7 @@ async def predict_client(loan_id: int):
     if cls == "default":
         badge_color = "#2D1515"   # red
         icon        = "🚫"
-        bg          = "#F1CDCD"
+        bg          = "#F7E5E5"
         border      = "#E53E3E"
     else:
         badge_color = "#152D1E"   # green
@@ -135,7 +135,7 @@ async def predict_client(loan_id: int):
             {icon} {decision}
         </div>
         <div style="margin-top:10px;font-size:17px;color:#29333f;font-weight:500">
-            Client ID &nbsp;<span style="color:#29333f;font-weight:700">{loan_id}</span>
+            Client ID &nbsp;<span style="color:#1a1f26;font-weight:700">{loan_id}</span>
             &nbsp;·&nbsp;
             Default probability &nbsp;<span style="color:{badge_color};font-weight:700">{proba:.1%}</span>
             &nbsp;·&nbsp;
@@ -239,10 +239,10 @@ with gr.Blocks(css=css_ui, title="Home Credit Scoring") as demo:
 
     # ── Outputs ────────────────────────────────────────────────────────────────
     with gr.Row():
-        with gr.Column(scale=0, min_width=800):
+        with gr.Column(scale=1):
             decision_out = gr.HTML(label="Decision")
     with gr.Row():
-        with gr.Column(scale=2):
+        with gr.Column(scale=0, min_width=900):
             shap_plot = gr.Plot(value=empty_plot, label="SHAP Waterfall — Feature Contributions")
         with gr.Column(scale=1):
             client_info_out = gr.HTML(label="Information about the current client application")
