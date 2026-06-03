@@ -242,7 +242,7 @@ with gr.Blocks(css=css_ui, title="Home Credit Scoring") as demo:
         with gr.Column(scale=1):
             decision_out = gr.HTML(label="Decision")
     with gr.Row():
-        with gr.Column(scale=0, min_width=900):
+        with gr.Column(scale=0, min_width=700):
             shap_plot = gr.Plot(value=empty_plot, label="SHAP Waterfall — Feature Contributions")
         with gr.Column(scale=1):
             client_info_out = gr.HTML(label="Information about the current client application")
