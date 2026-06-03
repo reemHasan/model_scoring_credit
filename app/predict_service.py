@@ -1,7 +1,20 @@
 import json
-from time import perf_counter
+import time
 import uuid
-import pandas as pd
+from time import perf_counter
+from app.logger import log_prediction
+from app.database import store_record   # now both async
+from fastapi import HTTPException
+
+def json_to_dict(json_str: str | None) -> dict | None:
+    """Parse a JSON string that contains a list with one dict → return the dict."""
+    if not json_str:
+        return None
+    try:
+        parsed = json.loads(json_str)
+        return parsed[0] if isinstance(parsed, list) else parsed
+    except Exception:
+        return None
 
 def run_prediction(loan_id: int, app_state) -> dict:
     """
@@ -11,16 +24,13 @@ def run_prediction(loan_id: int, app_state) -> dict:
     Returns a plain dict with all result fields.
     """
     n_clients = app_state.client_data.shape[0]
-    request_id  = str(uuid.uuid4())
-    t_start     = perf_counter()
     # Ensure client id exists in test data
     if not (1 <= loan_id <= n_clients):
         raise ValueError(f"Client id not in application database. "
             f"Enter a whole number between 1 and {n_clients}.")
     # Load current client data
     client_particulars = app_state.client_data.iloc[[loan_id-1]]
-
-    # Predict decision of client credit application +++++++++++++++++++++++++ 
+    # Predict decision of client credit application 
     # prediction[0][0] is proba of class 0 (no default) and prediction[0][1] is proba of class 1 (default)
     # Inference (timed separately)
     t_infer   = perf_counter() #The time.perf_counter() function returns a high-resolution timer value used to measure how long a piece of code takes to run. It is designed for performance measurement, includes time spent during sleep
@@ -31,16 +41,96 @@ def run_prediction(loan_id: int, app_state) -> dict:
     decision    = "Reject loan application" if proba > app_state.best_threshold else "Accept loan application"
     # Get shap values for current client +++++++++++++++++++++++++++++++++++++++++++++
     shap_values_client = app_state.shap_values_all.iloc[[loan_id-1]]
-    total_ms = round((perf_counter() - t_start) * 1000, 2)
     return {
-        'request_id': request_id,
         'Client_id': loan_id,
-        'Client default probability': proba, 
+        'Client default '
+        'probability': proba, 
         'Class': proba_class,
             'Decision': decision,
             'inference_ms': inference_ms,
-            'total_ms': total_ms,
             'Client_info': client_particulars.to_json(orient='records'),
             'Expected_Shap_Value' : float(app_state.expected_value),
             'Shap_values_client' : shap_values_client.to_json(orient='records')
             }
+
+async def predict_and_log( loan_id: int, state) -> dict:
+    print("id log prediction:", id(log_prediction))
+    request_id = str(uuid.uuid4()) # generate universally unique identifiers (UUIDs) for each request to track them in logs and DB
+    t_start    = time.perf_counter()
+    try:
+        result = run_prediction(loan_id, state)
+        inference_ms = result.get("inference_ms", 0)
+        total_ms = round((time.perf_counter() - t_start) * 1000, 2)
+        features    = json_to_dict(result.get("Client_info"))
+        shap_values = json_to_dict(result.get("Shap_values_client"))
+        # Step 1 — fast JSON log (before response)
+        log_prediction(
+            request_id=   request_id,
+            loan_id=      loan_id,
+            proba_default= result["Client default probability"],
+            proba_class=  result["Class"],
+            decision=     result["Decision"],
+            inference_ms= inference_ms,
+            total_ms=     total_ms,
+            status_code=  200,
+            client_features= features,
+            shap_values= shap_values,
+            error_message= None,
+        )
+        # Step 2 — async DB write (after response, via BackgroundTasks)
+        await store_record(                # store_record is async — BackgroundTasks handles it
+            request_id=    request_id,
+            loan_id=       loan_id,
+            proba_default= result["Client default probability"],
+            proba_class=   result["Class"],
+            decision=      result["Decision"],
+            inference_ms=  inference_ms,
+            total_ms=      total_ms,
+            status_code=   200,
+            error_message= None,
+            features=      features,
+            shap_values=   shap_values,
+        )
+    except ValueError as e:
+        total_ms = round((time.perf_counter() - t_start) * 1000, 2)
+        log_prediction(
+            request_id=request_id, loan_id=loan_id,
+            proba_default=None, proba_class=None, decision=None,
+            inference_ms=0, total_ms=total_ms,
+            status_code=400, error_message=str(e),
+            client_features=None, shap_values=None # 400 Bad Request is appropriate for invalid input
+        )
+        await store_record(
+            request_id=request_id, loan_id=loan_id,
+            proba_default=None, proba_class=None, decision=None,
+            inference_ms=0, total_ms=total_ms,
+            status_code=400, error_message=str(e),
+            features=None, shap_values=None,
+        )
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        total_ms = round((time.perf_counter() - t_start) * 1000, 2)
+        log_prediction(
+            request_id=request_id, loan_id=loan_id,
+            proba_default=None, proba_class=None, decision=None,
+            inference_ms=0, total_ms=total_ms,
+            status_code=500, error_message=str(e),
+            client_features=None, shap_values=None
+        )
+        await store_record(
+            request_id=request_id, loan_id=loan_id,
+            proba_default=None, proba_class=None, decision=None,
+            inference_ms=0, total_ms=total_ms,
+            status_code=500, error_message=str(e),
+            features=None, shap_values=None,
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+    return {**result, "request_id": request_id, "total_ms": total_ms}
+
+
+
+    
+
+
+

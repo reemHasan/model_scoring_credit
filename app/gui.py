@@ -1,5 +1,5 @@
 import gradio as gr
-import requests
+from fastapi import HTTPException
 import json
 import numpy as np
 import matplotlib
@@ -7,8 +7,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import shap
-from predict_service import run_prediction
-from state_store import get_state 
+from app.predict_service import predict_and_log
+from app.state_store import get_state 
 
 # CONFIG
 # Deploy in local
@@ -94,14 +94,16 @@ def empty_plot():
     return fig
 
 # MAIN PREDICT FUNCTION
-def predict_client(loan_id: int):
+async def predict_client(loan_id: int):
     """Called by Gradio — gets app.state from the FastAPI app object."""
 
     try:
         state = get_state()
-        data = run_prediction(int(loan_id), state)
-    except ValueError as e:
-        return f"<div style='color:red'>{e}</div>", None, ""
+        data = await predict_and_log( int(loan_id), state)
+    except HTTPException as e:
+        return f"<div style='color:red'>Error {e.status_code}: {e.detail}</div>", None, ""
+    except Exception as e:
+        return f"<div style='color:red'>Unexpected error: {e}</div>", None, ""
 
     proba    = data["Client default probability"]
     decision = data["Decision"]
