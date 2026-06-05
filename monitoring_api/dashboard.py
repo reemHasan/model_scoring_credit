@@ -126,9 +126,7 @@ with st.sidebar:
 # Auto-refresh
 # st_autorefresh(interval=refresh_sec * 1000, key="dashboard_refresh")
 st_autorefresh(interval=refresh_hours * 3600 * 1000, key="dashboard_refresh")
-
 # ── Load data functions ──────────────────────────────────────────────────────────
-
 #BASE_DIR = Path(__file__).parent.parent
 #@st.cache_data
 #def get_ref__data():
