@@ -12,7 +12,7 @@ COPY pyproject.toml uv.lock* ./
 # Install dependencies into /app/.venv
 # --frozen: respect uv.lock exactly
 # --no-dev:  skip dev/test tools in production image
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --no-monitoring
 
 # ── Stage 2: runtime — lean final image ──────────────────────────────────────
 FROM python:3.12-slim AS runtime
