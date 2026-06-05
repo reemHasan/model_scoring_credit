@@ -165,7 +165,7 @@ features_wide["Target"] = (features_wide["proba_class"] == "default").astype(int
 logs["Target"] = (logs["proba_class"] == "default").astype(int)
 #print("Logs info:", logs.shape[0], "rows,", logs.shape[1], "columns")
 print("Client api info:", features_wide.shape[0], "rows,", features_wide.shape[1], "columns")
-print("Client api data columns:", features_wide.columns)
+# print("Client api data columns:", features_wide.columns)
 # ===========================================================================================
 # Apply lookback filter
 #==========================================================================================
@@ -303,7 +303,6 @@ if error_rate > 0:
         margin=dict(l=0, r=0, t=40, b=0),
     )
     st.plotly_chart(fig_err, width='content')
-
 # ══════════════════════════════════════════════════════════════════════════════
 # SCORE DISTRIBUTION + SCORE DRIFT — side by side
 # ══════════════════════════════════════════════════════════════════════════════

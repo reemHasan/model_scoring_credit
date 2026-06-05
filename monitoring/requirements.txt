@@ -1,0 +1,9 @@
+streamlit>=1.56.0
+streamlit-autorefresh
+plotly
+evidently
+pandas
+sqlalchemy
+psycopg2-binary
+psycopg[binary]
+python-dotenv
