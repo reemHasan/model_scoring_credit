@@ -31,6 +31,7 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0.46",
     "streamlit>=1.56.0",
     "pytest-asyncio>=1.4.0",
+    "streamlit-autorefresh>=1.0.1",
 ]
 
 [dependency-groups]
