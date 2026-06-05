@@ -15,7 +15,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [prod]
+    branches: [main]
  
 jobs:
  

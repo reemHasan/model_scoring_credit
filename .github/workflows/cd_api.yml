@@ -18,7 +18,7 @@ on:
   workflow_run:
     workflows: ["CI — Test"]     # exact name from ci.yml
     types: [completed]
-    branches: [prod]             # only when CI ran on main
+    branches: [main]             # only when CI ran on main
 
 jobs:
 
