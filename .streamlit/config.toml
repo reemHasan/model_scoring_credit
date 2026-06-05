@@ -1,4 +1,0 @@
-[server]
-runOnSave = true
-[client]
-toolbarMode = "viewer"
