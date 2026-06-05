@@ -150,4 +150,4 @@ tempCodeRunnerFile.py
 .pypirc
 
 # Streamlit
-.streamlit/secrets.toml
+.streamlit/
