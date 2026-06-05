@@ -110,7 +110,6 @@ st.markdown("""
     .stRadio > div { gap: 12px; }
 </style>
 """, unsafe_allow_html=True)
-
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### ⚙️ Settings")
@@ -124,7 +123,6 @@ with st.sidebar:
                           help="% of earliest data used as Evidently reference")
     st.divider()
     st.caption("🔄 Auto-refreshes every {} hours".format(refresh_hours))
-
 # Auto-refresh
 # st_autorefresh(interval=refresh_sec * 1000, key="dashboard_refresh")
 st_autorefresh(interval=refresh_hours * 3600 * 1000, key="dashboard_refresh")
