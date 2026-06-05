@@ -5,13 +5,12 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = "==3.12.*"
 dependencies = [
-    "scikit-learn>=1.8.0",
-    "lightgbm>=4.6.0",
-    "shap>=0.50.0",
     "alembic>=1.18.4",
     "cufflinks>=0.17.3",
+    "evidently>=0.7.21",
     "gradio>=6.14.0",
     "huggingface-hub>=1.12.0",
+    "lightgbm>=4.6.0",
     "matplotlib>=3.10.8",
     "missingno>=0.5.2",
     "numba>=0.59.0",
@@ -24,12 +23,14 @@ dependencies = [
     "psycopg2-binary>=2.9.0",    # psycopg2   — for sync engine + alembic
     "pytest-cov>=7.1.0",
     "python-dotenv>=1.2.1",
+    "scikit-learn>=1.8.0",
     "seaborn>=0.13.2",
+    "shap>=0.50.0",
     "skl2onnx>=1.20.0",
     "skops>=0.13.0",
     "sqlalchemy[asyncio]>=2.0.46",
+    "streamlit>=1.56.0",
     "pytest-asyncio>=1.4.0",
-    "plotly>=5.24.1",
 ]
 
 [dependency-groups]
@@ -39,10 +40,5 @@ dev = [
     "ipywidgets>=8.1.8",
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
-    "pytest-asyncio>=1.4.0",
     "mlflow>=3.9.0",
-    "evidently>=0.7.21",
-    "plotly>=5.24.1",
-    "streamlit>=1.56.0",
-    "streamlit-autorefresh>=1.0.1",
 ]
