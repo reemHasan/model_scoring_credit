@@ -28,7 +28,7 @@ htmlcov/
 coverage.xml
 
 #_ Monitoring dashboard (not needed in production image) ─────────────
-monitoring/
+monitoring_api/
 
 # ── Jupyter / notebooks ───────────────────────────────────────────────────────
 *.ipynb
@@ -95,3 +95,5 @@ build/
 
 # Streamlit
 .streamlit/
+# not upload monitoring files
+# monitoring_api/

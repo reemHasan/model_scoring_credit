@@ -83,6 +83,7 @@ jobs:
                   "ml/model/grid_fbeta_model_bundle.pkl",
                   ".pytest_cache/*",
                   ".ipynb_checkpoints/*",
+                  "monitoring_api/*",      # monitoring files not needed on HF Space
 
               ],
               commit_message=f"Deploy {sha} via GitHub Actions",
