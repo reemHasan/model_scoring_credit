@@ -41,8 +41,6 @@ dev = [
     "pytest-cov>=7.1.0",
     "pytest-asyncio>=1.4.0",
     "mlflow>=3.9.0",
-]
-monitoring = [
     "evidently>=0.7.21",
     "plotly>=5.24.1",
     "streamlit>=1.56.0",
