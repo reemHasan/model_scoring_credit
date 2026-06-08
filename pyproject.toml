@@ -42,4 +42,6 @@ dev = [
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
     "mlflow>=3.9.0",
+    "snakeviz>=2.2.2",
+    "pyinstrument>=5.1.2",
 ]

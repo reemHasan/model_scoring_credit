@@ -97,3 +97,6 @@ build/
 .streamlit/
 # not upload monitoring files
 # monitoring_api/
+# ignore profiling output files
+profiling_cprofile/
+profiling_output/

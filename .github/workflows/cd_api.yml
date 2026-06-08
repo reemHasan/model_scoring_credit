@@ -84,6 +84,9 @@ jobs:
                   ".pytest_cache/*",
                   ".ipynb_checkpoints/*",
                   "monitoring_api/*",      # monitoring files not needed on HF Space
+                  "app/profiling/*",
+                  "profiling_cprofile/*",
+                  "profiling_output/*"
 
               ],
               commit_message=f"Deploy {sha} via GitHub Actions",

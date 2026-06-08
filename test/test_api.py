@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from pathlib import Path
 import sys
 sys.path.append(str(Path("..").resolve()))
+from app import predict_service
 from app.api import app
 from app.state_store import set_state
 
@@ -68,7 +69,7 @@ def client(request):
     with patch("app.api.init_db", new_callable=AsyncMock) as mock_init_db, \
          patch("gradio.routes.mount_gradio_app", side_effect=lambda a, d, **kw: a), \
          patch("app.predict_service.log_prediction") as mock_log, \
-         patch("app.predict_service.store_record", new_callable=AsyncMock) as mock_store:
+         patch.object(predict_service,"store_record",new_callable=AsyncMock,) as mock_store:
         with TestClient(app, raise_server_exceptions=False) as c:
             c.mock_init_db = mock_init_db
             c.mock_log     = mock_log
@@ -82,7 +83,6 @@ def client(request):
                  "client_data", "shap_values_all", "expected_value"):
         if hasattr(app.state, attr):
             delattr(app.state, attr)
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 1. HEALTH ENDPOINT
@@ -108,7 +108,7 @@ class TestHealthEndpoint:
         with patch("app.api.init_db", new_callable=AsyncMock), \
             patch("gradio.routes.mount_gradio_app", side_effect=lambda a, d, **kw: a), \
             patch("app.predict_service.log_prediction"), \
-            patch("app.predict_service.store_record", new_callable=AsyncMock):
+            patch.object(predict_service,"store_record",new_callable=AsyncMock,):
             with TestClient(app) as c:
                 data = c.get("/health").json()
         assert data["model_loaded"] is False
@@ -213,7 +213,6 @@ class TestPredictEndpoint:
             assert data["Decision"] == "Reject loan application"
         else:
             assert data["Decision"] == "Accept loan application"
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 3. LOGGING TESTS — verify log_prediction() is called correctly

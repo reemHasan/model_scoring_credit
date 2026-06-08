@@ -1,10 +1,12 @@
 import json
 import time
 import uuid
+import asyncio
 from time import perf_counter
 from app.logger import log_prediction
 from app.database import store_record   # now both async
 from fastapi import HTTPException
+from fastapi import BackgroundTasks
 
 def json_to_dict(json_str: str | None) -> dict | None:
     """Parse a JSON string that contains a list with one dict → return the dict."""
@@ -53,10 +55,24 @@ def run_prediction(loan_id: int, app_state) -> dict:
             'Shap_values_client' : shap_values_client.to_json(orient='records')
             }
 
-async def predict_and_log( loan_id: int, state) -> dict:
+async def predict_and_log( loan_id: int, state, background_tasks: BackgroundTasks| None = None) -> dict:
     print("id log prediction:", id(log_prediction))
     request_id = str(uuid.uuid4()) # generate universally unique identifiers (UUIDs) for each request to track them in logs and DB
     t_start    = time.perf_counter()
+
+    def _schedule(coro_func, **kwargs):
+        """
+        Schedule a coroutine as background work.
+        - FastAPI context  → BackgroundTasks (tied to request lifecycle)
+        - Gradio context   → asyncio.create_task (fire and forget)
+        """
+        if background_tasks is not None:
+            # called from FastAPI endpoint — use BackgroundTasks
+            background_tasks.add_task(coro_func, **kwargs)
+        else:
+            # called from Gradio — use asyncio task
+            asyncio.create_task(coro_func(**kwargs))
+
     try:
         result = run_prediction(loan_id, state)
         inference_ms = result.get("inference_ms", 0)
@@ -77,21 +93,18 @@ async def predict_and_log( loan_id: int, state) -> dict:
             shap_values= shap_values,
             error_message= None,
         )
-        # Step 2 — async DB write (after response, via BackgroundTasks)
-        await store_record(                # store_record is async — BackgroundTasks handles it
-            request_id=    request_id,
-            loan_id=       loan_id,
-            proba_default= result["Client default probability"],
-            proba_class=   result["Class"],
-            decision=      result["Decision"],
-            inference_ms=  inference_ms,
-            total_ms=      total_ms,
-            status_code=   200,
-            error_message= None,
-            features=      features,
-            shap_values=   shap_values,
+        # slow — scheduled in background regardless of caller
+        _schedule(
+            store_record,
+            request_id=request_id, loan_id=loan_id,
+            proba_default=result["Client default probability"],
+            proba_class=result["Class"], decision=result["Decision"],
+            inference_ms=inference_ms, total_ms=total_ms,
+            status_code=200, error_message=None,
+            features=features, shap_values=shap_values,
         )
     except ValueError as e:
+        print("ENTERED VALUEERROR BLOCK")
         total_ms = round((time.perf_counter() - t_start) * 1000, 2)
         log_prediction(
             request_id=request_id, loan_id=loan_id,
@@ -100,13 +113,13 @@ async def predict_and_log( loan_id: int, state) -> dict:
             status_code=400, error_message=str(e),
             client_features=None, shap_values=None # 400 Bad Request is appropriate for invalid input
         )
-        await store_record(
-            request_id=request_id, loan_id=loan_id,
+        # just in case of error, write into db by ascync method as fastapi raise exception before background tasks finished
+        await store_record(request_id=request_id, loan_id=loan_id,
             proba_default=None, proba_class=None, decision=None,
             inference_ms=0, total_ms=total_ms,
             status_code=400, error_message=str(e),
-            features=None, shap_values=None,
-        )
+            features=None, shap_values=None,)
+        print("TASK SCHEDULED")
         raise HTTPException(status_code=400, detail=str(e))
 
     except Exception as e:

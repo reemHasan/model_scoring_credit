@@ -1,3 +1,9 @@
+"""import sys
+import asyncio
+if sys.platform.startswith("win"):
+    asyncio.set_event_loop_policy(
+        asyncio.WindowsSelectorEventLoopPolicy()
+    )"""
 import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -11,8 +17,10 @@ from app.state_store import set_state
 from app.database import init_db
 from app.gui import demo
 from gradio.routes import mount_gradio_app
+# uncomment when profiling
+#from app.profiling.profiler  import ProfilerMiddleware
 # from fastapi.responses import RedirectResponse
-
+from fastapi import BackgroundTasks
 
 BASE_DIR = Path(__file__).parent.parent
 
@@ -57,9 +65,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-#@app.get("/")
-#async def root_redirect():
-#    return RedirectResponse(url="/gui")
+# Enable when profiling
+# app.add_middleware(ProfilerMiddleware)
+
 
 @app.get("/health")
 def health(request: Request):
@@ -76,10 +84,10 @@ def health(request: Request):
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/predict/{loan_id}")
-async def predict(loan_id: int, request: Request): # background tasks to be run after returning a response
+async def predict(loan_id: int, request: Request, background_tasks: BackgroundTasks): # background tasks to be run after returning a response
     
     """Run prediction for a given loan_id and return the result. Logs the request and response details."""
-    return await predict_and_log(loan_id, request.app.state)
+    return await predict_and_log(loan_id, request.app.state, background_tasks)
 
 
 # Mount Gradio at "/" 

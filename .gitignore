@@ -151,3 +151,6 @@ tempCodeRunnerFile.py
 
 # Streamlit
 .streamlit/
+# ignore profiling output files
+profiling_cprofile/
+profiling_output/
