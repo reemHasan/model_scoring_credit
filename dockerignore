@@ -27,8 +27,6 @@ htmlcov/
 .coverage
 coverage.xml
 
-#_ Monitoring dashboard (not needed in production image) ─────────────
-monitoring_api/
 
 # ── Jupyter / notebooks ───────────────────────────────────────────────────────
 *.ipynb
@@ -100,3 +98,5 @@ build/
 # ignore profiling output files
 profiling_cprofile/
 profiling_output/
+#_ Monitoring dashboard (not needed in production image) ─────────────
+monitoring_api/
