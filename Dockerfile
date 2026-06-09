@@ -35,6 +35,7 @@ COPY app/ ./app/
 # Copy model and data (large files — kept in final image for HF Spaces)
 # paths relative to build context (project root)
 COPY ml/model/lgbm_bestmodel_fbeta10_bundle.pkl ./ml/model/lgbm_bestmodel_fbeta10_bundle.pkl
+COPY ml/model/lgbm_model_quantized.onxx ./ml/model/lgbm_model_quantized.onnx
 COPY data/prod_data/ ./data/prod_data/
 
 # COPY app/gradio_app.py  ./app/gradio_app.py

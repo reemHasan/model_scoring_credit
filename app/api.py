@@ -1,9 +1,3 @@
-"""import sys
-import asyncio
-if sys.platform.startswith("win"):
-    asyncio.set_event_loop_policy(
-        asyncio.WindowsSelectorEventLoopPolicy()
-    )"""
 import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -21,6 +15,7 @@ from gradio.routes import mount_gradio_app
 #from app.profiling.profiler  import ProfilerMiddleware
 # from fastapi.responses import RedirectResponse
 from fastapi import BackgroundTasks
+import onnxruntime as rt
 
 BASE_DIR = Path(__file__).parent.parent
 
@@ -32,10 +27,20 @@ async def lifespan(app: FastAPI):
     #if not hasattr(app.state, "model"):   # skip if already injected (tests)
     if not hasattr(app.state, "client_data"):
         model_bundle = joblib.load(BASE_DIR / "ml/model/lgbm_bestmodel_fbeta10_bundle.pkl")
-        app.state.model_name = "lightgbm"
-        app.state.model = model_bundle["model"]
+        app.state.model_name = "onxx"
+        #app.state.model = model_bundle["model"]
         app.state.features = model_bundle["feature_names"]
         app.state.best_threshold = model_bundle["threshold"]
+        # Load ONNX session — replaces bundle["model"]
+        sess_options = rt.SessionOptions()
+        sess_options.graph_optimization_level = rt.GraphOptimizationLevel.ORT_ENABLE_ALL
+        sess_options.intra_op_num_threads = 1
+
+        app.state.onnx_session = rt.InferenceSession(
+            str(BASE_DIR/"ml/model/lgbm_model_quantized.onnx"),
+            sess_options=sess_options,
+            providers=["CPUExecutionProvider"],
+        )
         # Load client test data
         client_data = pd.read_parquet(BASE_DIR / "data/prod_data/new_test_data_20Features.parquet")
         print("Client data shape: ",client_data.shape)
@@ -74,8 +79,8 @@ app.add_middleware(
 def health(request: Request):
     """Check if the API is running and if the model is loaded."""
     try:                      
-        model = request.app.state.model if hasattr(request.app.state, "model") else None
-        return {"status": "ok", "model_loaded": model is not None, "version": "1.0.0",
+        session = request.app.state.onnx_session if hasattr(request.app.state, "onnx_session") else None
+        return {"status": "ok", "model_loaded": session is not None, "version": "1.0.0",
                 "model name": app.state.model_name,
                 "available_endpoints": {
                 "gradio interface": "/",
@@ -89,8 +94,7 @@ def health(request: Request):
 async def predict(loan_id: int, request: Request, background_tasks: BackgroundTasks): # background tasks to be run after returning a response
     
     """Run prediction for a given loan_id and return the result. Logs the request and response details."""
-    return await predict_and_log(loan_id, request.app.state, request.app.state.model_name,  background_tasks)
-
+    return await predict_and_log(loan_id, request.app.state,  background_tasks)
 
 # Mount Gradio at "/" 
 app = mount_gradio_app(app, demo, path="/")

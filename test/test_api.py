@@ -44,6 +44,34 @@ def make_fake_model(proba: float = 0.3) -> MagicMock:
     model = MagicMock()
     model.predict_proba.return_value = np.array([[1 - proba, proba]])
     return model
+"""
+def make_fake_onnx_session(proba: float = 0.3)-> MagicMock:
+    session = MagicMock()
+    # fake input metadata
+    input_meta = MagicMock()
+    input_meta.name = "float_input"
+    session.get_inputs.return_value = [input_meta]
+    # fake outputs returned by session.run()
+    labels = np.array([1], dtype=np.int64)
+    probabilities = np.array([[1 - proba, proba]], dtype=np.float32)
+    session.run.return_value = [labels, probabilities]
+    return session
+"""
+def make_fake_onnx_session(proba: float = 0.3)-> MagicMock:
+    session = MagicMock()
+    input_meta = MagicMock()
+    input_meta.name = "float_input"
+    session.get_inputs.return_value = [input_meta]
+    output_meta1 = MagicMock()
+    output_meta1.name = "label"
+    output_meta2 = MagicMock()
+    output_meta2.name = "probabilities"
+    session.get_outputs.return_value = [
+        output_meta1,
+        output_meta2,
+    ]
+    session.run.return_value = [np.array([[1 - proba, proba]], dtype=np.float32)]
+    return session
 
 # ── Core fixture ──────────────────────────────────────────────────────────────
 @pytest.fixture()
@@ -58,13 +86,14 @@ def client(request):
     log_prediction and store_record are patched in predict_service — that is where they are imported and called. 
     """
     proba = getattr(request, "param", {}).get("proba", 0.3)
-    app.state.model           = make_fake_model(proba)
+    #app.state.model           = make_fake_model(proba)
+    app.state.onnx_session = make_fake_onnx_session(proba)
     app.state.features        = FEATURE_NAMES
     app.state.best_threshold  = THRESHOLD
     app.state.client_data     = make_fake_client_data()
     app.state.shap_values_all = make_fake_shap_values()
     app.state.expected_value  = 0.12
-    app.state.model_name = "lightgbm"
+    app.state.model_name = "onnx"
     set_state(app.state)
     # patch init_db in lifespan to avoid real DB connection, and patch mount_gradio_app to prevent Gradio from starting
     with patch("app.api.init_db", new_callable=AsyncMock) as mock_init_db, \
@@ -80,8 +109,8 @@ def client(request):
             #print("fixture log id:", id(mock_log))
             #print("service log id:", id(predict_service.log_prediction))
             yield c
-    for attr in ("model", "features", "best_threshold",
-                 "client_data", "shap_values_all", "expected_value"):
+    for attr in ("onnx_session", "features", "best_threshold",
+                 "client_data", "shap_values_all", "expected_value","model_name"):
         if hasattr(app.state, attr):
             delattr(app.state, attr)
 
@@ -100,13 +129,13 @@ class TestHealthEndpoint:
         assert client.get("/health").json()["status"] == "ok"
 
     def test_model_loaded_false_when_none(self):
-        app.state.model           = None
+        app.state.onnx_session          = None
         app.state.features        = FEATURE_NAMES
         app.state.best_threshold  = THRESHOLD
         app.state.client_data     = make_fake_client_data()
         app.state.shap_values_all = make_fake_shap_values()
         app.state.expected_value  = 0.12
-        app.state.model_name = "lightgbm"
+        app.state.model_name = "onnx"
         with patch("app.api.init_db", new_callable=AsyncMock), \
             patch("gradio.routes.mount_gradio_app", side_effect=lambda a, d, **kw: a), \
             patch("app.predict_service.log_prediction"), \
@@ -132,6 +161,7 @@ class TestPredictEndpoint:
         "Client_info",
         "Expected_Shap_Value",
         "Shap_values_client",
+        "model_name"
     }
 
     # ── Input validation ──────────────────────────────────────────────────────
@@ -206,7 +236,9 @@ class TestPredictEndpoint:
 
     @pytest.mark.parametrize("client", [{"proba": 0.3}], indirect=True)
     def test_proba_at_threshold_is_accepted(self, client):
-        assert client.post("/predict/1").json()["Class"] == "no default"
+        data = client.post("/predict/1").json()
+        # print("onnx prob:",data["Client default probability"])
+        assert data["Class"] == "no default"
 
     @pytest.mark.parametrize("client", [{"proba": 0.8}], indirect=True)
     def test_class_and_decision_are_consistent(self, client):
@@ -415,12 +447,14 @@ class TestPredictor:
         class FakeState:
             pass
         state                 = FakeState()
-        state.model           = make_fake_model(proba=0.4)
+        #state.model           = make_fake_model(proba=0.4)
+        state.onnx_session = make_fake_onnx_session(proba=0.4)
         state.features        = FEATURE_NAMES
         state.best_threshold  = THRESHOLD
         state.client_data     = make_fake_client_data()
         state.shap_values_all = make_fake_shap_values()
         state.expected_value  = 0.12
+        state.model_name  = "onxx"
         return state
 
     def test_valid_id_returns_dict(self, fake_state):

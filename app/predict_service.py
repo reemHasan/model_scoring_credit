@@ -7,6 +7,7 @@ from app.logger import log_prediction
 from app.database import store_record   # now both async
 from fastapi import HTTPException
 from fastapi import BackgroundTasks
+import numpy as np
 
 def json_to_dict(json_str: str | None) -> dict | None:
     """Parse a JSON string that contains a list with one dict → return the dict."""
@@ -32,13 +33,19 @@ def run_prediction(loan_id: int, app_state) -> dict:
             f"Enter a whole number between 1 and {n_clients}.")
     # Load current client data
     client_particulars = app_state.client_data.iloc[[loan_id-1]]
-    # Predict decision of client credit application 
-    # prediction[0][0] is proba of class 0 (no default) and prediction[0][1] is proba of class 1 (default)
+    # Get onnx session from app state
+    session     = app_state.onnx_session
+    input_name  = session.get_inputs()[0].name
+    output_name = session.get_outputs()[1].name
     # Inference (timed separately)
     t_infer   = perf_counter() #The time.perf_counter() function returns a high-resolution timer value used to measure how long a piece of code takes to run. It is designed for performance measurement, includes time spent during sleep
-    prediction = app_state.model.predict_proba(client_particulars)
+    X = client_particulars.values.astype(np.float32)
+    prediction = session.run([output_name], {input_name: X})[0]
+    # prediction = app_state.model.predict_proba(client_particulars)
     inference_ms = round((perf_counter() - t_infer) * 1000, 2)
-    proba      = float(prediction[0][1])
+    proba = round(float(prediction[0][1]), 6)
+    #print(repr(proba))
+    # print(repr(app_state.best_threshold))
     proba_class = "default"    if proba > app_state.best_threshold else "no default"
     decision    = "Reject loan application" if proba > app_state.best_threshold else "Accept loan application"
     # Get shap values for current client +++++++++++++++++++++++++++++++++++++++++++++
@@ -55,7 +62,7 @@ def run_prediction(loan_id: int, app_state) -> dict:
             'Shap_values_client' : shap_values_client.to_json(orient='records')
             }
 
-async def predict_and_log( loan_id: int, state, model_name, background_tasks: BackgroundTasks| None = None) -> dict:
+async def predict_and_log( loan_id: int, state, background_tasks: BackgroundTasks| None = None) -> dict:
     print("id log prediction:", id(log_prediction))
     request_id = str(uuid.uuid4()) # generate universally unique identifiers (UUIDs) for each request to track them in logs and DB
     t_start    = time.perf_counter()
@@ -91,7 +98,7 @@ async def predict_and_log( loan_id: int, state, model_name, background_tasks: Ba
             status_code=  200,
             client_features= features,
             shap_values= shap_values,
-            model_runtime= model_name,
+            model_runtime= state.model_name,
             error_message= None,
         )
         # slow — scheduled in background regardless of caller
@@ -103,7 +110,7 @@ async def predict_and_log( loan_id: int, state, model_name, background_tasks: Ba
             inference_ms=inference_ms, total_ms=total_ms,
             status_code=200, error_message=None,
             features=features, shap_values=shap_values,
-            model_runtime=model_name
+            model_runtime=state.model_name
         )
     except ValueError as e:
         print("ENTERED VALUEERROR BLOCK")
@@ -141,7 +148,7 @@ async def predict_and_log( loan_id: int, state, model_name, background_tasks: Ba
             features=None, shap_values=None, model_runtime="None"
         )
         raise HTTPException(status_code=500, detail=str(e))
-    return {**result, "request_id": request_id, "total_ms": total_ms}
+    return {**result, "request_id": request_id, "total_ms": total_ms, "model_name": state.model_name}
 
 
 
