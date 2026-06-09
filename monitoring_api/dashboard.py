@@ -201,11 +201,12 @@ st.markdown('<div class="section-header">Key Metrics</div>', unsafe_allow_html=T
 
 total_calls   = len(logs)
 error_rate    = (logs["status_code"] >= 400).mean()
+max_latency = logs["total_ms"].max()
 avg_latency   = logs["total_ms"].mean()
 avg_inference = logs["inference_ms"].mean()
 rejected_rate = (logs["proba_class"] == "default").mean() if "proba_class" in logs.columns else 0.0
 
-c1, c2, c3, c4, c5 = st.columns(5)
+c1, c2, c3, c4, c5, c6 = st.columns(6)
 
 with c1:
     st.metric("Total Calls", f"{total_calls:,}",
@@ -217,14 +218,18 @@ with c2:
               delta="above threshold" if error_rate > 0.05 else "normal",
               delta_color=delta_color)
 with c3:
+    st.metric("Max Latency", f"{max_latency:.1f} ms",
+              delta="high" if max_latency > 4000 else "normal",
+              delta_color="inverse" if max_latency > 4000 else "normal")
+with c4:
     st.metric("Avg Latency", f"{avg_latency:.1f} ms",
               delta="high" if avg_latency > 500 else "normal",
               delta_color="inverse" if avg_latency > 500 else "normal")
-with c4:
+with c5:
     st.metric("Avg Inference", f"{avg_inference:.1f} ms",
               delta="high" if avg_inference > 300 else "normal",
               delta_color="inverse" if avg_inference > 300 else "normal")
-with c5:
+with c6:
     st.metric("Rejection Rate", f"{rejected_rate:.1%}",
               delta="high" if rejected_rate > 0.4 else "normal",
               delta_color="inverse" if rejected_rate > 0.4 else "normal")

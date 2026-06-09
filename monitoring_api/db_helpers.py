@@ -64,6 +64,7 @@ def load_logs_df():
             "total_ms":      r.total_ms,
             "status_code":   r.status_code,
             "error_message": r.error_message,
+            "model_runtime": r.model_runtime,
         }
         for r in rows
     ]
