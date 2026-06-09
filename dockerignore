@@ -100,3 +100,4 @@ profiling_cprofile/
 profiling_output/
 #_ Monitoring dashboard (not needed in production image) ─────────────
 monitoring_api/
+artifacts/

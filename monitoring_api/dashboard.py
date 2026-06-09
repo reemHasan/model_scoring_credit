@@ -133,11 +133,11 @@ st_autorefresh(interval=refresh_hours * 3600 * 1000, key="dashboard_refresh")
 #    reference_data = pd.read_parquet(BASE_DIR / "data/training_data/test_data_bestFeatures.parquet")
 #    return reference_data
 
-@st.cache_data(ttl="1d")
+@st.cache_data(ttl="3h")
 def get_log_data():
     return load_logs_df(), load_features_wide_df()
 
-@st.cache_data(ttl="1d", show_spinner="Generating drift report...")
+@st.cache_data(ttl="3h", show_spinner="Generating drift report...")
 def build_drift_report(ref_data, cur_data,metric_name):
     if metric_name == "drift":
         metric = DataDriftPreset()
