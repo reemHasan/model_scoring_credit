@@ -81,19 +81,20 @@ def load_features_wide_df():
 
     with Session(sync_engine) as session:
         rows = session.execute(
-            text("SELECT request_id, timestamp, loan_id, proba_default, proba_class, features FROM loan_api_logs WHERE features IS NOT NULL ORDER BY timestamp")
+            text("SELECT status_code,  timestamp, loan_id, proba_default, proba_class, features FROM loan_api_logs WHERE features IS NOT NULL ORDER BY timestamp")
         ).fetchall()
     if not rows:
         return pd.DataFrame()
 
     records = [
-        {"request_id": r.request_id,
+        {"status_code": r.status_code,
          "timestamp":  r.timestamp,
          "loan_id":    r.loan_id,
          "proba_default": r.proba_default,
          "proba_class":   r.proba_class,
          **r.features}          # unpack all feature keys as columns
         for r in rows
+         if r.status_code==200
     ]
     df = pd.DataFrame(records)
     df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)

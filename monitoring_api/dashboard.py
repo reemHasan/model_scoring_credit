@@ -219,8 +219,8 @@ with c2:
               delta_color=delta_color)
 with c3:
     st.metric("Max Latency", f"{max_latency:.1f} ms",
-              delta="high" if max_latency > 4000 else "normal",
-              delta_color="inverse" if max_latency > 4000 else "normal")
+              delta="high" if max_latency > 3000 else "normal",
+              delta_color="inverse" if max_latency > 3000 else "normal")
 with c4:
     st.metric("Avg Latency", f"{avg_latency:.1f} ms",
               delta="high" if avg_latency > 500 else "normal",
