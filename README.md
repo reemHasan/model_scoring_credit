@@ -70,29 +70,34 @@ Streamlit Dashboard (HuggingFace Space 2)
 ## 2. Project Structure
 
 ```
-projet2/
+model_scoring_credit/
 │
 ├── app/                          # API source code
 │   ├── api.py                    # FastAPI app + lifespan
 │   ├── gui.py                    # Gradio interface (mounted inside FastAPI)
 │   ├── predict_service.py        # predict_and_log() — inference + logging
-│   ├── predict_service_onnx.py   # ONNX inference engine
 │   ├── logger.py                 # Structured JSON logger (stdout + file)
 │   ├── database.py               # SQLAlchemy ORM + PostgreSQL storage
 │   ├── state_store.py            # Shared state between FastAPI and Gradio
 │   └── profiling/
 │       └── profiler.py           # PyInstrument middleware
 │
-├── dashboard/                    # Streamlit monitoring dashboard
-│   ├── app.py
-│   └── requirements.txt
+├── monitoring_api/                    # Streamlit monitoring dashboard
+│    ├── dashboard.py
+|    ├── db_helpers.py
+|    ├── Dockerfile
+|    ├── README.md
+│    └── requirements.txt
 │
-├── ml/                           # Model artefacts
+├── ml/                           # Model artifacts
 │   └── model/
 │       ├── lgbm_bestmodel_fbeta10_bundle.pkl
-│       └── onnx/
-│           ├── lgbm_model.onnx
-│           └── lgbm_model_quantized.onnx
+│       ├── lgbm_model.onnx
+│       └── lgbm_model_quantized.onnx
+|        └── scripts/                      # One-off utility scripts
+│           ├── convert_to_onnx.py
+│           ├── quantize_onnx.py
+│           └──benchmark.py 
 │
 ├── data/prod_data/               # Production data
 │   ├── new_test_data_20features.parquet
@@ -103,25 +108,13 @@ projet2/
 │   ├── conftest.py
 │   └── test_api.py
 │
-├── scripts/                      # One-off utility scripts
-│   ├── convert_to_onnx.py
-│   ├── quantize_onnx.py
-│   ├── benchmark.py
-│   └── run_profiling.py
-│
-├── deployment/                   # Deployment configuration
-│   ├── api/
-│   │   ├── docker-compose.yml
-│   │   └── README.md
-│   └── dashboard/
-│       └── README.md
-│
 ├── .github/workflows/
 │   ├── ci.yml                    # Tests on every PR
 │   ├── cd_api.yml                # Deploy API to HF Space
 │   └── cd_dashboard.yml          # Deploy dashboard to HF Space
 │
 ├── Dockerfile                    # API container (HF Spaces compatible)
+├── docker-compose.yml  
 ├── pyproject.toml                # Dependencies managed by uv
 ├── uv.lock
 └── README.md
@@ -297,11 +290,11 @@ with TestClient(app) as c:
 # ← client closed here — background tasks flushed
 assert mock_store.called   # ← now safe
 ```
--->
+
 ### Run tests
 ```bash
 pytest test/test_api.py -v --tb=short --cov=app --cov-report=term-missing
-```
+```-->
 
 ---
 
@@ -382,25 +375,32 @@ return result   # ← user gets response here, DB write happens after
 ```
 
 ### Step 3 — ONNX conversion + quantization
+Performance profiling identified model inference as a potential optimization target. The LightGBM model was converted to ONNX format and executed with ONNX Runtime using the CPUExecutionProvider. To obtain stable measurements, the models were warmed up before benchmarking and each configuration was evaluated over 1000 consecutive predictions.
+
+The ONNX float32 implementation reduced inference latency by approximately 20.97× compared with the original LightGBM model. Static INT8 quantization provided an overall speedup of 23.31× relative to the initial implementation.
+
+Since quantization preserved prediction accuracy while slightly improving latency, the quantized INT8 model was selected as the final production model.
+
 
 ```bash
 # Convert LightGBM → ONNX float32
-python scripts/convert_to_onnx.py
+python ml/src/convert_to_onnx.py
 
 # Quantize ONNX float32 → INT8
-python scripts/quantize_onnx.py
+python ml/src/quantize_onnx.py
 
 # Benchmark all 3 versions
-python scripts/benchmark.py
+python ml/src/benchmark.py
 ```
 
 ### Benchmark results (typical)
 
 | Version | Mean latency | Speedup |
 |---------|-------------|---------|
-| LightGBM native | baseline | 1x |
-| ONNX float32 | ~2x faster | 2x |
-| ONNX INT8 quantized | ~3–5x faster | 3–5x |
+| LightGBM (baseline) | 1.223296 | 1x |
+| ONNX float32 | 0.058343 | 20.97× faster |
+| ONNX INT8 quantized | 0.052482 | 23.31× faster |
+| INT8 vs ONNX FP32 |  -- | 1.11× faster |
 
 ---
 

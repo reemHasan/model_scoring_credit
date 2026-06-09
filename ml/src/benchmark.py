@@ -9,7 +9,7 @@ from pathlib import Path
 BASE_DIR   = Path(__file__).parent.parent
 BASE_DIR_DATA   = Path(__file__).parent.parent.parent
 print(BASE_DIR_DATA)
-N_RUNS     = 20
+N_RUNS     = 1000
 LOAN_IDS   = list(range(1, N_RUNS + 1))
 
 # Load artifacts
@@ -21,6 +21,9 @@ client_data = pd.read_parquet(
 
 # ── Benchmark 1: original LightGBM ───────────────────────────────────────────
 print("Benchmarking original LightGBM...")
+# LightGBM warmup
+model.predict_proba(client_data.iloc[[0]])
+
 lgbm_times = []
 for lid in LOAN_IDS:
     X = client_data.iloc[[lid - 1]]
@@ -37,6 +40,10 @@ sess_f32   = rt.InferenceSession(
 in_name    = sess_f32.get_inputs()[0].name
 out_name   = sess_f32.get_outputs()[1].name
 
+# ONNX warmup
+X0 = client_data.iloc[[0]].values.astype(np.float32)
+sess_f32.run([out_name], {in_name: X0})
+
 onnx_times = []
 for lid in LOAN_IDS:
     X = client_data.iloc[[lid - 1]].values.astype(np.float32)
@@ -50,6 +57,8 @@ sess_int8  = rt.InferenceSession(
     str(BASE_DIR/"model/lgbm_model_quantized.onnx"),
     providers=["CPUExecutionProvider"],
 )
+# ONNX int warmup
+sess_int8.run([out_name], {in_name: X0})
 quant_times = []
 for lid in LOAN_IDS:
     X = client_data.iloc[[lid - 1]].values.astype(np.float32)
@@ -74,3 +83,18 @@ print(f"INT8  speedup vs ONNX f32  : {np.mean(onnx_times)/np.mean(quant_times):.
 
 results.to_csv(BASE_DIR/"artifacts/benchmark_results.csv", index=False)
 print("\n✅ Results saved to artifacts/benchmark_results.csv")
+# Verify if prediction of all model is the same
+lgbm_pred = model.predict_proba(client_data.iloc[[0]])
+
+onnx_pred = sess_f32.run(
+    [out_name],
+    {in_name: client_data.iloc[[0]].values.astype(np.float32)}
+)[0]
+onnx_int8_pred = sess_int8.run(
+    [out_name],
+    {in_name: client_data.iloc[[0]].values.astype(np.float32)}
+)[0]
+
+print(lgbm_pred)
+print(onnx_pred)
+print(onnx_int8_pred)

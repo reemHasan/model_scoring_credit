@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
 import pandas as pd
+import numpy as np
 import joblib
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -48,6 +49,13 @@ async def lifespan(app: FastAPI):
         # Load SHAP values
         app.state.shap_values_all = pd.read_parquet(BASE_DIR / "data/prod_data/shap_values.parquet")
         app.state.expected_value = joblib.load(BASE_DIR / "data/prod_data/expected_value.pkl")
+        # Pre-warm — run one dummy prediction so first real request is fast
+        dummy_X = app.state.client_data.iloc[[0]].values.astype(np.float32)
+        # ONNX warm-up
+        session    = app.state.onnx_session
+        input_name = session.get_inputs()[0].name
+        out_name   = session.get_outputs()[1].name
+        session.run([out_name], {input_name: dummy_X})
         # store reference BEFORE Gradio wraps app
         set_state(app.state)               
         print("All assets loaded")
