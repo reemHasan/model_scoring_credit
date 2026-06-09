@@ -32,6 +32,7 @@ async def lifespan(app: FastAPI):
     #if not hasattr(app.state, "model"):   # skip if already injected (tests)
     if not hasattr(app.state, "client_data"):
         model_bundle = joblib.load(BASE_DIR / "ml/model/lgbm_bestmodel_fbeta10_bundle.pkl")
+        app.state.model_name = "lightgbm"
         app.state.model = model_bundle["model"]
         app.state.features = model_bundle["feature_names"]
         app.state.best_threshold = model_bundle["threshold"]
@@ -75,11 +76,12 @@ def health(request: Request):
     try:                      
         model = request.app.state.model if hasattr(request.app.state, "model") else None
         return {"status": "ok", "model_loaded": model is not None, "version": "1.0.0",
-        "available_endpoints": {
-        #    "gui": "/gui",
-            "predict": "/predict/{loan_id}",
-            "docs": "/docs",},
-        }
+                "model name": app.state.model_name,
+                "available_endpoints": {
+                "gradio interface": "/",
+                "predict": "/predict/{loan_id}",
+                "docs": "/docs",},
+                }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -87,7 +89,7 @@ def health(request: Request):
 async def predict(loan_id: int, request: Request, background_tasks: BackgroundTasks): # background tasks to be run after returning a response
     
     """Run prediction for a given loan_id and return the result. Logs the request and response details."""
-    return await predict_and_log(loan_id, request.app.state, background_tasks)
+    return await predict_and_log(loan_id, request.app.state, request.app.state.model_name,  background_tasks)
 
 
 # Mount Gradio at "/" 

@@ -79,6 +79,7 @@ def log_prediction(
     error_message:   str | None,
     client_features: dict | None,
     shap_values:     dict | None,
+    model_runtime: str   | None,
 ):
     """Insert one row into api_logs """
     # python logger (JSON to stdout/file) ────────────────────────────────
@@ -95,4 +96,5 @@ def log_prediction(
         "error":         error_message,
         "features":      client_features,
         "shap_values":   shap_values,
+        "model_runtime": model_runtime,
     }})

@@ -75,6 +75,7 @@ async def store_record(
     error_message: str   | None,
     features:      dict  | None,
     shap_values:   dict  | None,
+    model_runtime: str   | None,
 ):
     """
     Async insert — called as a FastAPI BackgroundTask so it runs after the response is already sent to the user.
@@ -92,6 +93,7 @@ async def store_record(
         error_message= error_message,
         features=      features,
         shap_values=   shap_values,
+        model_runtime= model_runtime,
     )
     try:
         # insert info into PostgreSQL — if this fails, we log the error but do not re-raise (DB failure should not affect API availability)

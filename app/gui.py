@@ -99,7 +99,7 @@ async def predict_client(loan_id: int):
 
     try:
         state = get_state()
-        data = await predict_and_log( int(loan_id), state)
+        data = await predict_and_log( int(loan_id), state, state.model_name)
     except HTTPException as e:
         return f"<div style='color:red'>Error {e.status_code}: {e.detail}</div>", None, ""
     except Exception as e:

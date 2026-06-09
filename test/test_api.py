@@ -64,6 +64,7 @@ def client(request):
     app.state.client_data     = make_fake_client_data()
     app.state.shap_values_all = make_fake_shap_values()
     app.state.expected_value  = 0.12
+    app.state.model_name = "lightgbm"
     set_state(app.state)
     # patch init_db in lifespan to avoid real DB connection, and patch mount_gradio_app to prevent Gradio from starting
     with patch("app.api.init_db", new_callable=AsyncMock) as mock_init_db, \
@@ -105,6 +106,7 @@ class TestHealthEndpoint:
         app.state.client_data     = make_fake_client_data()
         app.state.shap_values_all = make_fake_shap_values()
         app.state.expected_value  = 0.12
+        app.state.model_name = "lightgbm"
         with patch("app.api.init_db", new_callable=AsyncMock), \
             patch("gradio.routes.mount_gradio_app", side_effect=lambda a, d, **kw: a), \
             patch("app.predict_service.log_prediction"), \

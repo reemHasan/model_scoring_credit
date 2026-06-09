@@ -33,4 +33,6 @@ class LoanApiLog(Base):
     error_message: Mapped[str | None]     = mapped_column(Text,     nullable=True)
     features:      Mapped[dict | None]    = mapped_column(JSON,     nullable=True)   # all input features in one row
     shap_values:   Mapped[dict | None]    = mapped_column(JSON,     nullable=True)
+    model_runtime: Mapped[str | None]    = mapped_column(Text,  nullable=True, default="lightgbm")
+
 

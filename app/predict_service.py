@@ -55,7 +55,7 @@ def run_prediction(loan_id: int, app_state) -> dict:
             'Shap_values_client' : shap_values_client.to_json(orient='records')
             }
 
-async def predict_and_log( loan_id: int, state, background_tasks: BackgroundTasks| None = None) -> dict:
+async def predict_and_log( loan_id: int, state, model_name, background_tasks: BackgroundTasks| None = None) -> dict:
     print("id log prediction:", id(log_prediction))
     request_id = str(uuid.uuid4()) # generate universally unique identifiers (UUIDs) for each request to track them in logs and DB
     t_start    = time.perf_counter()
@@ -91,6 +91,7 @@ async def predict_and_log( loan_id: int, state, background_tasks: BackgroundTask
             status_code=  200,
             client_features= features,
             shap_values= shap_values,
+            model_runtime= model_name,
             error_message= None,
         )
         # slow — scheduled in background regardless of caller
@@ -102,6 +103,7 @@ async def predict_and_log( loan_id: int, state, background_tasks: BackgroundTask
             inference_ms=inference_ms, total_ms=total_ms,
             status_code=200, error_message=None,
             features=features, shap_values=shap_values,
+            model_runtime=model_name
         )
     except ValueError as e:
         print("ENTERED VALUEERROR BLOCK")
@@ -111,14 +113,14 @@ async def predict_and_log( loan_id: int, state, background_tasks: BackgroundTask
             proba_default=None, proba_class=None, decision=None,
             inference_ms=0, total_ms=total_ms,
             status_code=400, error_message=str(e),
-            client_features=None, shap_values=None # 400 Bad Request is appropriate for invalid input
+            client_features=None, shap_values=None, model_runtime="None" # 400 Bad Request is appropriate for invalid input
         )
         # just in case of error, write into db by ascync method as fastapi raise exception before background tasks finished
         await store_record(request_id=request_id, loan_id=loan_id,
             proba_default=None, proba_class=None, decision=None,
             inference_ms=0, total_ms=total_ms,
             status_code=400, error_message=str(e),
-            features=None, shap_values=None,)
+            features=None, shap_values=None, model_runtime="None")
         print("TASK SCHEDULED")
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -129,14 +131,14 @@ async def predict_and_log( loan_id: int, state, background_tasks: BackgroundTask
             proba_default=None, proba_class=None, decision=None,
             inference_ms=0, total_ms=total_ms,
             status_code=500, error_message=str(e),
-            client_features=None, shap_values=None
+            client_features=None, shap_values=None, model_runtime="None"
         )
         await store_record(
             request_id=request_id, loan_id=loan_id,
             proba_default=None, proba_class=None, decision=None,
             inference_ms=0, total_ms=total_ms,
             status_code=500, error_message=str(e),
-            features=None, shap_values=None,
+            features=None, shap_values=None, model_runtime="None"
         )
         raise HTTPException(status_code=500, detail=str(e))
     return {**result, "request_id": request_id, "total_ms": total_ms}
