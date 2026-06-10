@@ -259,7 +259,7 @@ with c6:
 # ══════════════════════════════════════════════════════════════════════════════
 #st.markdown('<div class="section-header">Latency Over Time</div>', unsafe_allow_html=True)
 
-st.markdown('<div class="section-header"> LightGBM vs ONNX — Latency Comparison</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-header"> LightGBM vs ONNX — Latency & Inference Comparison</div>', unsafe_allow_html=True)
 
 col_compare, col_inf = st.columns(2)
 with col_compare:
