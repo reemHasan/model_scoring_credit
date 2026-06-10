@@ -210,14 +210,91 @@ st.markdown(
 if logs_onnx.empty:
     st.warning("No logs found in the selected window. Make some predictions first.")
     st.stop()
+# ══════════════════════════════════════════════════════════════════════════════
+# LightGBM vs Onnx
+# ══════════════════════════════════════════════════════════════════════════════
+_,_,col_btn= st.columns(3)
+if col_btn.button("📊 Show LightGBM vs ONNX Comparison "):
+# ── Only render charts when toggled on ───────────────────────────────────────
+    if logs_lgbm.empty:
+        st.info("No LightGBM data found in the database — deploy comparison unavailable.")
+    else:
+        #st.markdown('<div class="section-header"> LightGBM vs ONNX — Latency & Inference Comparison</div>', unsafe_allow_html=True)
+        col_compare, col_inf = st.columns(2)
+        with col_compare:
+            st.markdown('<div class="section-header">Latency Distribution — LightGBM vs ONNX INT8</div>', unsafe_allow_html=True)
+            # Build comparison dataframe
+            compare_df = pd.DataFrame({
+                "Model":  ["LightGBM"] * len(logs_lgbm) + ["ONNX INT8"] * len(logs_onnx),
+                "total_ms":     list(logs_lgbm["total_ms"].dropna())     + list(logs_onnx["total_ms"].dropna()),
+                "inference_ms": list(logs_lgbm["inference_ms"].dropna()) + list(logs_onnx["inference_ms"].dropna()),
+            })
+            # Box plot — shows distribution, not just mean
+            fig_compare = px.box(
+                compare_df, x="Model", y="total_ms", color="Model",
+                #title="API Latency Distribution — LightGBM vs ONNX INT8",
+                labels={"total_ms": "Total latency (ms)", "Model": ""},
+                template="plotly_dark",
+                color_discrete_map={
+                    "LightGBM":  "#EF4444",
+                    "ONNX INT8": "#10B981",
+                },
+                #points="all",       # show all data points
+            )
+            fig_compare.update_layout(
+                plot_bgcolor="#0F1117", paper_bgcolor="#0F1117",
+                font_color="#94A3B8", height=320,
+                margin=dict(l=0, r=0, t=40, b=0),
+                showlegend=False,
+            )
+            # Add speedup annotation
+            lgbm_mean = logs_lgbm["total_ms"].mean()
+            onnx_mean = logs_onnx["total_ms"].mean()
+            if lgbm_mean and onnx_mean:
+                speedup = lgbm_mean / onnx_mean
+                fig_compare.add_annotation(
+                    text=f"⚡ {speedup:.1f}x faster",
+                    xref="paper", yref="paper",
+                    x=0.98, y=0.95, showarrow=False,
+                    font=dict(color="#10B981", size=14),
+                )
+            st.plotly_chart(fig_compare, width='content')
 
+        with col_inf:
+            # Inference time comparison — bar chart with mean + p95
+            st.markdown('<div class="section-header">Inference Time — Mean vs P95</div>', unsafe_allow_html=True)
+            stats_df = pd.DataFrame({
+                "Model":   ["LightGBM", "LightGBM", "ONNX INT8", "ONNX INT8"],
+                "Metric":  ["Mean", "P95", "Mean", "P95"],
+                "ms": [
+                    logs_lgbm["inference_ms"].mean(),
+                    logs_lgbm["inference_ms"].quantile(0.95),
+                    logs_onnx["inference_ms"].mean(),
+                        logs_onnx["inference_ms"].quantile(0.95),
+                    ],
+                    })
+            fig_inf = px.bar(
+                stats_df, x="Model", y="ms", color="Metric",
+                barmode="group",
+                #title="Inference Time — Mean vs P95",
+                labels={"ms": "ms", "Model": ""},
+                template="plotly_dark",
+                color_discrete_map={"Mean": "#3B82F6", "P95": "#F59E0B"},
+                text=stats_df["ms"].apply(lambda x: f"{x:.1f}ms"),
+                )
+            fig_inf.update_traces(textposition="outside")
+            fig_inf.update_layout(
+            plot_bgcolor="#0F1117", paper_bgcolor="#0F1117",
+            font_color="#94A3B8", height=320,
+            margin=dict(l=0, r=0, t=40, b=0),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02),
+            )
+            st.plotly_chart(fig_inf, width='content')
 # ══════════════════════════════════════════════════════════════════════════════
 # KPI ROW
 # ══════════════════════════════════════════════════════════════════════════════
-st.markdown('<div class="section-header">Key Metrics</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div style="font-size:15px;color:#5fafaf;margin-bottom:8px">'
-    '📊 Statistics based on ONNX INT8 predictions only</div>',unsafe_allow_html=True)
+st.markdown('<div class="section-header">Key Metrics based on ONNX INT8 predictions </div>', unsafe_allow_html=True)
+#st.markdown('<div style="font-size:15px;color:#5fafaf;margin-bottom:8px">''📊 Statistics based on ONNX INT8 predictions only</div>',unsafe_allow_html=True)
 # ONNX only
 total_calls   = len(logs_onnx)
 error_rate    = (logs_onnx["status_code"] >= 400).mean()
@@ -225,9 +302,7 @@ max_latency = logs_onnx["total_ms"].max()
 avg_latency   = logs_onnx["total_ms"].mean()
 avg_inference = logs_onnx["inference_ms"].mean()
 rejected_rate = (logs_onnx["proba_class"] == "default").mean()if "proba_class" in logs_onnx.columns else 0.0
-
 c1, c2, c3, c4, c5, c6 = st.columns(6)
-
 with c1:
     st.metric("Total Calls", f"{total_calls:,}",
               delta="API High Demand" if total_calls > 1000 else "API normal Demand",
@@ -253,106 +328,29 @@ with c6:
     st.metric("Rejection Rate", f"{rejected_rate:.1%}",
               delta="high" if rejected_rate > 0.4 else "normal",
               delta_color="inverse" if rejected_rate > 0.4 else "normal")
-
 # ══════════════════════════════════════════════════════════════════════════════
+#st.markdown('<div class="section-header"> ONNX INT8 Prediction statistics</div>', unsafe_allow_html=True)
 # LATENCY CHARTS — side by side
 # ══════════════════════════════════════════════════════════════════════════════
-#st.markdown('<div class="section-header">Latency Over Time</div>', unsafe_allow_html=True)
-
-st.markdown('<div class="section-header"> LightGBM vs ONNX — Latency & Inference Comparison</div>', unsafe_allow_html=True)
-
-col_compare, col_inf = st.columns(2)
-with col_compare:
-    if not logs_lgbm.empty and not logs_onnx.empty:
-        st.markdown('<div class="section-header">Latency Distribution — LightGBM vs ONNX INT8</div>', unsafe_allow_html=True)
-        # Build comparison dataframe
-        compare_df = pd.DataFrame({
-            "Model":  ["LightGBM"] * len(logs_lgbm) + ["ONNX INT8"] * len(logs_onnx),
-            "total_ms":     list(logs_lgbm["total_ms"].dropna())     + list(logs_onnx["total_ms"].dropna()),
-            "inference_ms": list(logs_lgbm["inference_ms"].dropna()) + list(logs_onnx["inference_ms"].dropna()),
-        })
-        # Box plot — shows distribution, not just mean
-        fig_compare = px.box(
-            compare_df, x="Model", y="total_ms", color="Model",
-            #title="API Latency Distribution — LightGBM vs ONNX INT8",
-            labels={"total_ms": "Total latency (ms)", "Model": ""},
-            template="plotly_dark",
-            color_discrete_map={
-                "LightGBM":  "#EF4444",
-                "ONNX INT8": "#10B981",
-            },
-            #points="all",       # show all data points
+col_latency_onnx, col_inf_onnx = st.columns(2)
+with col_latency_onnx:
+    st.markdown('<div class="section-header">API Latency Over Time (ONNX INT8)</div>', unsafe_allow_html=True)
+    # No LightGBM data — show ONNX latency only
+    fig_lat = px.line(
+        logs_onnx, x="timestamp", y="total_ms",
+        #title="API Latency Over Time (ONNX INT8)",
+        labels={"total_ms": "ms", "timestamp": ""},
+        template="plotly_dark",
+        color_discrete_sequence=["#10B981"],
         )
-        fig_compare.update_layout(
-            plot_bgcolor="#0F1117", paper_bgcolor="#0F1117",
-            font_color="#94A3B8", height=320,
-            margin=dict(l=0, r=0, t=40, b=0),
-            showlegend=False,
+    fig_lat.update_layout(
+        plot_bgcolor="#0F1117", paper_bgcolor="#0F1117",
+        font_color="#94A3B8", height=320,
+        margin=dict(l=0, r=0, t=40, b=0),
         )
-        # Add speedup annotation
-        lgbm_mean = logs_lgbm["total_ms"].mean()
-        onnx_mean = logs_onnx["total_ms"].mean()
-        if lgbm_mean and onnx_mean:
-            speedup = lgbm_mean / onnx_mean
-            fig_compare.add_annotation(
-                text=f"⚡ {speedup:.1f}x faster",
-                xref="paper", yref="paper",
-                x=0.98, y=0.95, showarrow=False,
-                font=dict(color="#10B981", size=14),
-            )
-        st.plotly_chart(fig_compare, width='content')
-    elif not logs_onnx.empty:
-        st.markdown('<div class="section-header">API Latency Over Time (ONNX INT8)</div>', unsafe_allow_html=True)
-        # No LightGBM data — show ONNX latency only
-        fig_lat = px.line(
-            logs_onnx, x="timestamp", y="total_ms",
-            #title="API Latency Over Time (ONNX INT8)",
-            labels={"total_ms": "ms", "timestamp": ""},
-            template="plotly_dark",
-            color_discrete_sequence=["#10B981"],
-        )
-        fig_lat.update_layout(
-            plot_bgcolor="#0F1117", paper_bgcolor="#0F1117",
-            font_color="#94A3B8", height=320,
-            margin=dict(l=0, r=0, t=40, b=0),
-        )
-        st.plotly_chart(fig_lat, width='content')
-    else:
-        st.info("No data available yet.")
-
-with col_inf:
-    # Inference time comparison — bar chart with mean + p95
-    if not logs_lgbm.empty and not logs_onnx.empty:
-        st.markdown('<div class="section-header">Inference Time — Mean vs P95</div>', unsafe_allow_html=True)
-        stats_df = pd.DataFrame({
-            "Model":   ["LightGBM", "LightGBM", "ONNX INT8", "ONNX INT8"],
-            "Metric":  ["Mean", "P95", "Mean", "P95"],
-            "ms": [
-                logs_lgbm["inference_ms"].mean(),
-                logs_lgbm["inference_ms"].quantile(0.95),
-                logs_onnx["inference_ms"].mean(),
-                logs_onnx["inference_ms"].quantile(0.95),
-            ],
-        })
-        fig_inf = px.bar(
-            stats_df, x="Model", y="ms", color="Metric",
-            barmode="group",
-            #title="Inference Time — Mean vs P95",
-            labels={"ms": "ms", "Model": ""},
-            template="plotly_dark",
-            color_discrete_map={"Mean": "#3B82F6", "P95": "#F59E0B"},
-            text=stats_df["ms"].apply(lambda x: f"{x:.1f}ms"),
-        )
-        fig_inf.update_traces(textposition="outside")
-        fig_inf.update_layout(
-            plot_bgcolor="#0F1117", paper_bgcolor="#0F1117",
-            font_color="#94A3B8", height=320,
-            margin=dict(l=0, r=0, t=40, b=0),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02),
-        )
-        st.plotly_chart(fig_inf, width='content')
-    else:
-        st.markdown('<div class="section-header">Inference Time Over Time (ONNX INT8)</div>', unsafe_allow_html=True)
+    st.plotly_chart(fig_lat, width='content')
+with col_inf_onnx:
+        st.markdown('<div class="section-header">Inference Over Time (ONNX INT8)</div>', unsafe_allow_html=True)
         fig_inf = px.line(
             logs_onnx, x="timestamp", y="inference_ms",
             # title="Inference Time Over Time (ONNX INT8)",
@@ -366,8 +364,7 @@ with col_inf:
             margin=dict(l=0, r=0, t=40, b=0),
         )
         st.plotly_chart(fig_inf, width='content')
-# ══════════════════════════════════════════════════════════════════════════════
-st.markdown('<div class="section-header"> ONNX INT8 Prediction statistics</div>', unsafe_allow_html=True)
+
 # STATUS CODE DISTRIBUTION — only if errors exist
 # ══════════════════════════════════════════════════════════════════════════════
 if error_rate > 0:

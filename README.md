@@ -306,17 +306,18 @@ pytest test/test_api.py -v --tb=short --cov=app --cov-report=term-missing
 
 | Panel | Description |
 |-------|-------------|
+| Latency Comparison Lightgbm & ONNX  | latency box plot on-demand via button|
+| Inference Comparison Lightgbm & ONNX | Mean inference vs P95 bar chart on-demand via button|
 | KPI row | Total calls, error rate, max latency, avg latency, avg inference, rejection rate |
-| Latency Comparison Lightgbm & ONNX  | `total_ms` box plot |
-| Inference Comparison Lightgbm & ONNX | Mean vs P95 bar chart |
+| Latency over time | `total_ms` line chart with anomaly threshold (mean + 2σ) |
+| Inference over time | `inference_ms` line chart |
 | Error distribution | Status code bar chart — only shown when error rate > 0 |
 | Score over time | Avg predicted probability per class over time |
 | Class drift | Reference vs current default rate — grouped bar chart |
 | Evidently DataDrift | Full HTML report embedded via `st.components.v1.html` |
 | Evidently DataSummary | On-demand via radio button |
 
-<!--| Latency over time | `total_ms` line chart with anomaly threshold (mean + 2σ) |
-| Inference over time | `inference_ms` line chart |-->
+
 ### Auto-refresh
 Configurable from sidebar (1–24 hours) via `streamlit-autorefresh`.
 Evidently reports are cached for 3 hours (`@st.cache_data(ttl="3h")`)
