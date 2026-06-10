@@ -150,11 +150,6 @@ def build_drift_report(ref_data, cur_data,metric_name):
         return Path(f.name)
 # ==================================================================================================
 # ── Load data ─────────────────────────────────────────────────────────────────────
-# Get reference data for Evidently reports
-
-#reference_data = get_ref__data()
-#print("Reference data info:", reference_data.shape[0], "rows,", reference_data.shape[1], "columns")
-#print("Reference data columns:", reference_data.columns)"""
 # Get Api data from DB
 logs, features_wide = get_log_data()
 features_wide["Target"] = (features_wide["proba_class"] == "default").astype(int)
@@ -162,10 +157,22 @@ logs["Target"] = (logs["proba_class"] == "default").astype(int)
 #print("Logs info:", logs.shape[0], "rows,", logs.shape[1], "columns")
 print("Client api info:", features_wide.shape[0], "rows,", features_wide.shape[1], "columns")
 # print("Client api data columns:", features_wide.columns)
+
+# ── Split by model runtime ────────────────────────────────────────────────────
+if "model_runtime" in logs.columns:
+    logs_onnx  = logs[logs["model_runtime"] == "onnx"]
+    logs_lgbm  = logs[logs["model_runtime"] == "lightgbm"]
+    print("logs_onnx shape:", logs_onnx.shape)
+    print("logs_lgbm shape:", logs_lgbm.shape)
+else:
+    logs_onnx  = logs      # fallback if column missing
+    logs_lgbm  = pd.DataFrame()
 # ===========================================================================================
 # Apply lookback filter
 #==========================================================================================
-if not logs.empty:
+# Apply lookback filter to ONNX logs only (current production)
+print("refernce time is ",lookback)
+if not logs_onnx.empty:
     now = pd.Timestamp.now(tz="UTC")
     windows = {
         "Last 24h":    timedelta(hours=24),
@@ -175,9 +182,19 @@ if not logs.empty:
     }
     w = windows[lookback]
     if w:
-        logs = logs[logs["timestamp"] >= now - w]
+        logs_onnx = logs_onnx[logs_onnx["timestamp"] >= now - w]
         if not features_wide.empty:
-            features_wide = features_wide[features_wide["timestamp"] >= now - w]
+            # Evidently features — ONNX only
+            features_wide_onnx = features_wide[features_wide["request_id"].isin(logs_onnx["request_id"])
+            ] if "request_id" in features_wide.columns else features_wide
+            # extract features in the current window
+            features_wide_onnx = features_wide_onnx[features_wide_onnx["timestamp"] >= now - w]
+        else:
+            print("Error features table is empty")
+    else:
+        print("Please specify a reference time ")
+else:
+    print("Error logs table is empty")
 
 # ── TITLE ─────────────────────────────────────────────────────────────────────
 st.markdown('<div class="dashboard-title">🏦 Monitoring LOAN SCORING SYSTEM</div>', unsafe_allow_html=True)
@@ -190,7 +207,7 @@ st.markdown(
             <a href="https://github.com/reemHasan/model_scoring_credit" target="_blank">GitHub</a> 
         </p></div>""",unsafe_allow_html=True)
 
-if logs.empty:
+if logs_onnx.empty:
     st.warning("No logs found in the selected window. Make some predictions first.")
     st.stop()
 
@@ -198,13 +215,16 @@ if logs.empty:
 # KPI ROW
 # ══════════════════════════════════════════════════════════════════════════════
 st.markdown('<div class="section-header">Key Metrics</div>', unsafe_allow_html=True)
-
-total_calls   = len(logs)
-error_rate    = (logs["status_code"] >= 400).mean()
-max_latency = logs["total_ms"].max()
-avg_latency   = logs["total_ms"].mean()
-avg_inference = logs["inference_ms"].mean()
-rejected_rate = (logs["proba_class"] == "default").mean() if "proba_class" in logs.columns else 0.0
+st.markdown(
+    '<div style="font-size:15px;color:#5fafaf;margin-bottom:8px">'
+    '📊 Statistics based on ONNX INT8 predictions only</div>',unsafe_allow_html=True)
+# ONNX only
+total_calls   = len(logs_onnx)
+error_rate    = (logs_onnx["status_code"] >= 400).mean()
+max_latency = logs_onnx["total_ms"].max()
+avg_latency   = logs_onnx["total_ms"].mean()
+avg_inference = logs_onnx["inference_ms"].mean()
+rejected_rate = (logs_onnx["proba_class"] == "default").mean()if "proba_class" in logs_onnx.columns else 0.0
 
 c1, c2, c3, c4, c5, c6 = st.columns(6)
 
@@ -238,52 +258,121 @@ with c6:
 # LATENCY CHARTS — side by side
 # ══════════════════════════════════════════════════════════════════════════════
 #st.markdown('<div class="section-header">Latency Over Time</div>', unsafe_allow_html=True)
-col_lat, col_inf = st.columns(2)
-with col_lat:
-    #st.subheader('<div class="section-header">API Latency Over Time</div>')
-    st.markdown('<div class="section-header">API Latency Over Time</div>', unsafe_allow_html=True)
-    fig_lat = px.line(
-        logs, x="timestamp", y="total_ms",
-        #title="API Latency (total_ms)",
-        labels={"total_ms": "ms", "timestamp": ""},
-        template="plotly_dark",
-        color_discrete_sequence=["#3B82F6"],)
-    # anomaly threshold line
-    threshold = logs["total_ms"].mean() + 2 * logs["total_ms"].std()
-    fig_lat.add_hline(
-        y=threshold, line_dash="dash", line_color="#EF4444",
-        annotation_text=f"threshold {threshold:.0f}ms",
-        annotation_position="top right",
-    )
-    fig_lat.update_layout(
-        plot_bgcolor="#0F1117", paper_bgcolor="#0F1117",
-        font_color="#94A3B8", height=300,
-        margin=dict(l=0, r=0, t=40, b=0),
-    )
-    st.plotly_chart(fig_lat, width='content')
+
+st.markdown('<div class="section-header"> LightGBM vs ONNX — Latency Comparison</div>', unsafe_allow_html=True)
+
+col_compare, col_inf = st.columns(2)
+with col_compare:
+    if not logs_lgbm.empty and not logs_onnx.empty:
+        st.markdown('<div class="section-header">Latency Distribution — LightGBM vs ONNX INT8</div>', unsafe_allow_html=True)
+        # Build comparison dataframe
+        compare_df = pd.DataFrame({
+            "Model":  ["LightGBM"] * len(logs_lgbm) + ["ONNX INT8"] * len(logs_onnx),
+            "total_ms":     list(logs_lgbm["total_ms"].dropna())     + list(logs_onnx["total_ms"].dropna()),
+            "inference_ms": list(logs_lgbm["inference_ms"].dropna()) + list(logs_onnx["inference_ms"].dropna()),
+        })
+        # Box plot — shows distribution, not just mean
+        fig_compare = px.box(
+            compare_df, x="Model", y="total_ms", color="Model",
+            #title="API Latency Distribution — LightGBM vs ONNX INT8",
+            labels={"total_ms": "Total latency (ms)", "Model": ""},
+            template="plotly_dark",
+            color_discrete_map={
+                "LightGBM":  "#EF4444",
+                "ONNX INT8": "#10B981",
+            },
+            #points="all",       # show all data points
+        )
+        fig_compare.update_layout(
+            plot_bgcolor="#0F1117", paper_bgcolor="#0F1117",
+            font_color="#94A3B8", height=320,
+            margin=dict(l=0, r=0, t=40, b=0),
+            showlegend=False,
+        )
+        # Add speedup annotation
+        lgbm_mean = logs_lgbm["total_ms"].mean()
+        onnx_mean = logs_onnx["total_ms"].mean()
+        if lgbm_mean and onnx_mean:
+            speedup = lgbm_mean / onnx_mean
+            fig_compare.add_annotation(
+                text=f"⚡ {speedup:.1f}x faster",
+                xref="paper", yref="paper",
+                x=0.98, y=0.95, showarrow=False,
+                font=dict(color="#10B981", size=14),
+            )
+        st.plotly_chart(fig_compare, width='content')
+    elif not logs_onnx.empty:
+        st.markdown('<div class="section-header">API Latency Over Time (ONNX INT8)</div>', unsafe_allow_html=True)
+        # No LightGBM data — show ONNX latency only
+        fig_lat = px.line(
+            logs_onnx, x="timestamp", y="total_ms",
+            #title="API Latency Over Time (ONNX INT8)",
+            labels={"total_ms": "ms", "timestamp": ""},
+            template="plotly_dark",
+            color_discrete_sequence=["#10B981"],
+        )
+        fig_lat.update_layout(
+            plot_bgcolor="#0F1117", paper_bgcolor="#0F1117",
+            font_color="#94A3B8", height=320,
+            margin=dict(l=0, r=0, t=40, b=0),
+        )
+        st.plotly_chart(fig_lat, width='content')
+    else:
+        st.info("No data available yet.")
 
 with col_inf:
-    st.markdown('<div class="section-header">Model Inference Time Distribution</div>', unsafe_allow_html=True)
-    fig_inf = px.line(
-        logs, x="timestamp", y="inference_ms",
-        #title="Model Inference Time (inference_ms)",
-        labels={"inference_ms": "ms", "timestamp": ""},
-        template="plotly_dark",
-        color_discrete_sequence=["#10B981"],
-    )
-    fig_inf.update_layout(
-        plot_bgcolor="#0F1117", paper_bgcolor="#0F1117",
-        font_color="#94A3B8", height=300,
-        margin=dict(l=0, r=0, t=40, b=0),
-    )
-    st.plotly_chart(fig_inf, width='content')
-
+    # Inference time comparison — bar chart with mean + p95
+    if not logs_lgbm.empty and not logs_onnx.empty:
+        st.markdown('<div class="section-header">Inference Time — Mean vs P95</div>', unsafe_allow_html=True)
+        stats_df = pd.DataFrame({
+            "Model":   ["LightGBM", "LightGBM", "ONNX INT8", "ONNX INT8"],
+            "Metric":  ["Mean", "P95", "Mean", "P95"],
+            "ms": [
+                logs_lgbm["inference_ms"].mean(),
+                logs_lgbm["inference_ms"].quantile(0.95),
+                logs_onnx["inference_ms"].mean(),
+                logs_onnx["inference_ms"].quantile(0.95),
+            ],
+        })
+        fig_inf = px.bar(
+            stats_df, x="Model", y="ms", color="Metric",
+            barmode="group",
+            #title="Inference Time — Mean vs P95",
+            labels={"ms": "ms", "Model": ""},
+            template="plotly_dark",
+            color_discrete_map={"Mean": "#3B82F6", "P95": "#F59E0B"},
+            text=stats_df["ms"].apply(lambda x: f"{x:.1f}ms"),
+        )
+        fig_inf.update_traces(textposition="outside")
+        fig_inf.update_layout(
+            plot_bgcolor="#0F1117", paper_bgcolor="#0F1117",
+            font_color="#94A3B8", height=320,
+            margin=dict(l=0, r=0, t=40, b=0),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02),
+        )
+        st.plotly_chart(fig_inf, width='content')
+    else:
+        st.markdown('<div class="section-header">Inference Time Over Time (ONNX INT8)</div>', unsafe_allow_html=True)
+        fig_inf = px.line(
+            logs_onnx, x="timestamp", y="inference_ms",
+            # title="Inference Time Over Time (ONNX INT8)",
+            labels={"inference_ms": "ms", "timestamp": ""},
+            template="plotly_dark",
+            color_discrete_sequence=["#10B981"],
+        )
+        fig_inf.update_layout(
+            plot_bgcolor="#0F1117", paper_bgcolor="#0F1117",
+            font_color="#94A3B8", height=320,
+            margin=dict(l=0, r=0, t=40, b=0),
+        )
+        st.plotly_chart(fig_inf, width='content')
 # ══════════════════════════════════════════════════════════════════════════════
+st.markdown('<div class="section-header"> ONNX INT8 Prediction statistics</div>', unsafe_allow_html=True)
 # STATUS CODE DISTRIBUTION — only if errors exist
 # ══════════════════════════════════════════════════════════════════════════════
 if error_rate > 0:
     st.markdown('<div class="section-header">Error Distribution</div>', unsafe_allow_html=True)
-    error_logs = logs.copy()
+    error_logs = logs_onnx.copy()
     error_logs["hour"] = error_logs["timestamp"].dt.floor("h")
     status_over_time = (
         error_logs.groupby(["hour", "status_code"])
@@ -309,7 +398,7 @@ if error_rate > 0:
 # ══════════════════════════════════════════════════════════════════════════════
 #st.markdown('<div class="section-header">Score Distribution & Drift</div>', unsafe_allow_html=True)
 col_score, col_drift = st.columns(2)
-score_logs = logs.dropna(subset=["proba_default"])
+score_logs = logs_onnx.dropna(subset=["proba_default"])
 with col_score:
     st.markdown('<div class="section-header">Avg Predicted Score per Class Over Time</div>', unsafe_allow_html=True)
     if not score_logs.empty and "proba_class" in score_logs.columns:
@@ -420,18 +509,19 @@ with col_drift:
 # ══════════════════════════════════════════════════════════════════════════════
 st.markdown('<div class="section-header"> 📊 Evidently AI Reports</div>', unsafe_allow_html=True)
 
-feature_cols = [c for c in features_wide.columns
+feature_cols = [c for c in features_wide_onnx.columns
                 if c not in ("request_id", "timestamp", "loan_id", "proba_default","proba_class","Target")]
 
-if features_wide.empty or len(feature_cols) == 0:
+if features_wide_onnx.empty or len(feature_cols) == 0:
     st.info("No feature data available yet for drift analysis.")
 else:
     #ref_df    = reference_data[feature_cols]
     #cur_df    = features_wide[feature_cols]
     # use reference datafrom api logs instead of training data for more relevant drift analysis, and split it into reference vs current based on the slider
-    split_idx = max(1, int(len(features_wide) * ref_split / 100))
-    ref_df    = features_wide.iloc[:split_idx][feature_cols]
-    cur_df    = features_wide.iloc[split_idx:][feature_cols]
+    print("len(features_wide_onnx)", len(features_wide_onnx))
+    split_idx = max(1, int(len(features_wide_onnx) * ref_split / 100))
+    ref_df    = features_wide_onnx.iloc[:split_idx][feature_cols]
+    cur_df    = features_wide_onnx.iloc[split_idx:][feature_cols]
 
     if len(ref_df) < 5 or len(cur_df) < 5:
         st.warning(f"Not enough data for Evidently analysis. Need at least 5 rows in each window. "
@@ -468,6 +558,6 @@ else:
 st.divider()
 st.caption(
     f"Last updated: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')} · "
-    f"Showing {len(logs):,} requests · "
+    f"Showing {len(logs_onnx):,} requests for ONNX· "
     f"Auto-refresh every {refresh_hours}h"
 )

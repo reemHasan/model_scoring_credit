@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
     #if not hasattr(app.state, "model"):   # skip if already injected (tests)
     if not hasattr(app.state, "client_data"):
         model_bundle = joblib.load(BASE_DIR / "ml/model/lgbm_bestmodel_fbeta10_bundle.pkl")
-        app.state.model_name = "onxx"
+        app.state.model_name = "onnx"
         #app.state.model = model_bundle["model"]
         app.state.features = model_bundle["feature_names"]
         app.state.best_threshold = model_bundle["threshold"]
