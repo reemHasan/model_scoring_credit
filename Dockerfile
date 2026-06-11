@@ -34,6 +34,8 @@ COPY --from=builder /app/.venv /app/.venv
 COPY app/ ./app/
 # Copy model and data (large files — kept in final image for HF Spaces)
 # paths relative to build context (project root)
+RUN mkdir -p /app/ml/model
+RUN mkdir -p /data/prod_data/
 COPY ml/model/lgbm_bestmodel_fbeta10_bundle.pkl ./ml/model/lgbm_bestmodel_fbeta10_bundle.pkl
 COPY data/prod_data/ ./data/prod_data/
 COPY ml/model/lgbm_model_quantized.onnx ./ml/model/lgbm_model_quantized.onnx
