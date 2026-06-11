@@ -24,7 +24,6 @@ RUN useradd -m -u 1000 appuser
 #RUN apt-get update && apt-get install -y libgomp1 && apt-get clean && rm -rf /var/lib/apt/lists/*
 # Install OpenMP runtime — required by LightGBM, numba, scikit-learn
 RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 && apt-get clean && rm -rf /var/lib/apt/lists/*
-RUN apt-get update && apt-get install -y git git-lfs && git lfs install
 WORKDIR /app
 
 # Copy the virtual environment from builder
@@ -32,6 +31,8 @@ COPY --from=builder /app/.venv /app/.venv
 
 # Copy application code
 COPY app/ ./app/
+RUN apt-get update && apt-get install -y git git-lfs && git lfs install && git lfs pull
+
 # Copy model and data (large files — kept in final image for HF Spaces)
 # paths relative to build context (project root)
 RUN mkdir -p /app/ml/model
