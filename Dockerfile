@@ -31,7 +31,7 @@ COPY --from=builder /app/.venv /app/.venv
 
 # Copy application code
 COPY app/ ./app/
-RUN apt-get update && apt-get install -y git git-lfs && git lfs install && git lfs pull
+#RUN apt-get update && apt-get install -y git git-lfs && git lfs install && git lfs pull
 
 # Copy model and data (large files — kept in final image for HF Spaces)
 # paths relative to build context (project root)
@@ -42,7 +42,9 @@ COPY data/prod_data/ ./data/prod_data/
 COPY ml/model/lgbm_model_quantized.onnx ./ml/model/lgbm_model_quantized.onnx
 
 # COPY app/gradio_app.py  ./app/gradio_app.py
-
+RUN ls -lh ./ml/model
+RUN head -c 50 ./ml/model/lgbm_bestmodel_fbeta10_bundle.pkl || true
+RUN head -c 50 ./ml/model/lgbm_model_quantized.onnx || true
 # Create logs directory (writable by appuser)
 #RUN mkdir -p logs && chown -R appuser:appuser /app
 #USER appuser
