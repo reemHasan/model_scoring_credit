@@ -41,13 +41,11 @@ COPY ml/model/lgbm_bestmodel_fbeta10_bundle.pkl ./ml/model/lgbm_bestmodel_fbeta1
 COPY data/prod_data/ ./data/prod_data/
 COPY ml/model/lgbm_model_quantized.onnx ./ml/model/lgbm_model_quantized.onnx
 
-# COPY app/gradio_app.py  ./app/gradio_app.py
-RUN ls -lh ./ml/model
-RUN head -c 50 ./ml/model/lgbm_bestmodel_fbeta10_bundle.pkl || true
-RUN head -c 50 ./ml/model/lgbm_model_quantized.onnx || true
-# Create logs directory (writable by appuser)
-#RUN mkdir -p logs && chown -R appuser:appuser /app
-#USER appuser
+# debug commands
+#RUN ls -lh ./ml/model
+#RUN head -c 50 ./ml/model/lgbm_bestmodel_fbeta10_bundle.pkl || true
+#RUN head -c 50 ./ml/model/lgbm_model_quantized.onnx || true
+
 
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
@@ -60,5 +58,3 @@ EXPOSE 7860
 # Start FastAPI + Gradio on port 7860
 # api.py mounts Gradio via mount_gradio_app — one process, one port
 CMD ["uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "7860"]
-# test docker in local with uvicorn on 8000
-#CMD ["uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "8000"]
