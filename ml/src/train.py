@@ -25,6 +25,7 @@ bundle = joblib.load('../model/grid_fbeta_model_bundle.pkl')
 all_params  = bundle['all_params']
 features   = bundle['feature_names']
 best_threshold = bundle['threshold_fbeta10']
+print("best threshold: ", best_threshold)
 # Initialize MLflow client and set the experiment
 client = MlflowClient(tracking_uri="http://127.0.0.1:5000")
 projet1_exp1 = mlflow.set_experiment("credit_scoring_experiment")
@@ -80,5 +81,5 @@ model_bundle = {
 }
 
 # Save the model bundle to a file
-joblib.dump(model_bundle, '../model/lgbm_bestmodel_fbeta10_bundle.pkl', compress=3)
+joblib.dump(model_bundle, '../model/lgbm_bestmodel_fbeta10_bundle.pkl')
 print("Model bundle saved successfully!")
