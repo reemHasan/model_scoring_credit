@@ -6,8 +6,12 @@ emoji: 📊
 colorFrom: purple
 colorTo: pink
 ---
+<p align="center">
+  <img src="home_credit_scoring_logo.png" width="300">
+  <br>
+</p>
 
-# 🏦 Home Credit Loan Scoring — MLOps Project
+# Home Credit Loan Scoring — MLOps Project
 
 > End-to-end MLOps pipeline for a LightGBM loan default classifier:
 > model serving, monitoring, drift detection, profiling, and ONNX optimisation.
@@ -94,7 +98,7 @@ model_scoring_credit/
 │       ├── lgbm_bestmodel_fbeta10_bundle.pkl
 │       ├── lgbm_model.onnx
 │       └── lgbm_model_quantized.onnx
-|        └── scripts/                      # One-off utility scripts
+|        └── src/                      # One-off utility scripts
 │           ├── convert_to_onnx.py
 │           ├── quantize_onnx.py
 │           └──benchmark.py 
@@ -104,7 +108,7 @@ model_scoring_credit/
 │   ├── shap_values.parquet
 │   └── expected_value.pkl
 │
-├── tests/                        # Pytest test suite
+├── test/                        # Pytest test suite
 │   ├── conftest.py
 │   └── test_api.py
 │
@@ -123,6 +127,9 @@ model_scoring_credit/
 ---
 
 ## 3. Model & Data
+
+### Data
+  The Home Credit dataset consists of 307,511 training instances and 48,744 test instances, each described by 122 features. The original application data were enriched through the integration and aggregation of information from historical and external data sources.
 
 ### Model
 - **Algorithm**: LightGBM binary classifier
@@ -338,11 +345,8 @@ reference baseline (default: 30%). The rest is the current window.
 | Signal | Method | Alert |
 |--------|--------|-------|
 | Feature drift | KS test / chi² per feature | Evidently drift flag |
-| Score drift | Mean shift reference vs current | > 10 percentage points |
 | Class drift | Default rate reference vs current | > 10 percentage points |
 | Error rate | status_code ≥ 400 / total | > 5% |
-| Latency anomaly | Z-score on total_ms | > mean + 2σ |
-
 ---
 
 ## 9. Profiling & Optimisation
