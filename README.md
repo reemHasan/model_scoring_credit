@@ -6,10 +6,6 @@ emoji: 📊
 colorFrom: purple
 colorTo: pink
 ---
-<p align="center">
-  <img src="home_credit_scoring_logo.png" width="300">
-  <br>
-</p>
 
 # Home Credit Loan Scoring — MLOps Project
 
