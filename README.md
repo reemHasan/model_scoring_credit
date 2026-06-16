@@ -516,6 +516,10 @@ streamlit run monitoring_api/dashboard.py --server.runOnSave true
 ```bash
 pytest
 ```
+To get coverage test on app scripts
+```bash
+pytest --cov=app/ --cov-report html
+```
 
 ### Run profiling
 ```bash
