@@ -115,7 +115,7 @@ with st.sidebar:
     st.markdown("### ⚙️ Settings")
     # refresh_sec = st.slider("Auto-refresh (sec)", 10, 300, 60)
     refresh_hours = st.sidebar.slider("Auto-refresh (hours)", 1, 24, 3)
-    lookback    = st.selectbox("Lookback window", ["Last 24h", "Last 7 days", "Last 30 days", "All time"], index=1)
+    lookback    = st.selectbox("Lookback window", ["Last 24h", "Last 7 days", "Last 30 days", "All time"], index=3)
     st.divider()
     # to be used after when we have more data in the DB and want to adjust the reference window for drift analysis
     st.markdown("### 📊 Reference data ")
@@ -172,29 +172,34 @@ else:
 #==========================================================================================
 # Apply lookback filter to ONNX logs only (current production)
 print("refernce time is ",lookback)
-if not logs_onnx.empty:
+if logs_onnx.empty:
+    print("Error: logs table is empty")
+else:
     now = pd.Timestamp.now(tz="UTC")
     windows = {
-        "Last 24h":    timedelta(hours=24),
+        "Last 24h": timedelta(hours=24),
         "Last 7 days": timedelta(days=7),
-        "Last 30 days":timedelta(days=30),
-        "All time":    None,
+        "Last 30 days": timedelta(days=30),
+        "All time": None,
     }
     w = windows[lookback]
-    if w:
-        logs_onnx = logs_onnx[logs_onnx["timestamp"] >= now - w]
-        if not features_wide.empty:
-            # Evidently features — ONNX only
-            features_wide_onnx = features_wide[features_wide["request_id"].isin(logs_onnx["request_id"])
-            ] if "request_id" in features_wide.columns else features_wide
-            # extract features in the current window
-            features_wide_onnx = features_wide_onnx[features_wide_onnx["timestamp"] >= now - w]
-        else:
-            print("Error features table is empty")
+    cutoff = (now - w) if w is not None else None  # single source of truth
+
+    def apply_cutoff(df):
+        return df[df["timestamp"] >= cutoff] if cutoff is not None else df
+
+    logs_onnx = apply_cutoff(logs_onnx)
+
+    if features_wide.empty:
+        print("Error: features table is empty")
+        features_wide_onnx = features_wide
     else:
-        print("Please specify a reference time ")
-else:
-    print("Error logs table is empty")
+        features_wide_onnx = (
+            features_wide[features_wide["request_id"].isin(logs_onnx["request_id"])]
+            if "request_id" in features_wide.columns
+            else features_wide
+        )
+        features_wide_onnx = apply_cutoff(features_wide_onnx)
 
 # ── TITLE ─────────────────────────────────────────────────────────────────────
 st.markdown('<div class="dashboard-title">🏦 Monitoring LOAN SCORING SYSTEM</div>', unsafe_allow_html=True)
